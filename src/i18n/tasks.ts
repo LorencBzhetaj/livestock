@@ -1,0 +1,43 @@
+const sq = {
+  calendar: 'Kalendari', add: 'Shto detyrë', edit: 'Ndrysho detyrën', save: 'Ruaj detyrën',
+  task: 'Detyra', title: 'Titulli', description: 'Përshkrimi', type: 'Lloji i detyrës', dueDate: 'Data e afatit',
+  vaccination: 'Vaksinim', checkup: 'Kontroll veterinar', treatmentFollowUp: 'Ndjekje pas trajtimit', general: 'Detyrë e fermës',
+  pending: 'Në pritje', completed: 'E përfunduar', cancelled: 'E anuluar', overdue: 'Me vonesë',
+  complete: 'Përfundo detyrën', cancelTask: 'Anulo detyrën', confirmCancel: 'Konfirmo anulimin', reschedule: 'Riplanifiko',
+  today: 'Sot', week: '7 ditët e ardhshme', month: '30 ditët e ardhshme', upcoming: 'Detyrat e ardhshme',
+  agenda: 'Axhenda ditore', previous: 'Muaji i kaluar', next: 'Muaji tjetër', chooseDay: 'Data e axhendës',
+  from: 'Nga data', to: 'Deri më', rangeError: 'Data e fundit duhet të jetë pas datës së parë ose e njëjtë me të.',
+  empty: 'Nuk ka detyra për këtë pamje.', missing: 'Detyra nuk u gjet.', noAnimal: 'Pa kafshë',
+  event: 'Regjistrimi veterinar', latestEvent: 'Hap versionin më të fundit', currentSourceDate: 'Data në regjistrimin aktual',
+  noSourceDate: 'Regjistrimi aktual nuk ka datë pasuese.', addReminder: 'Krijo kujtesë', reviewReminder: 'Kontrollo kujtesën',
+  confirmReminder: 'Konfirmo kujtesën', viewReminder: 'Hap kujtesën', reminderChanged: 'Data në regjistrim ndryshoi. Kontrolloni datën aktuale para se të konfirmoni.',
+  closed: 'Kjo detyrë është mbyllur.', linked: 'Kafsha dhe lloji i kujtesës përcaktohen nga regjistrimi i lidhur.',
+  created: 'Krijuar', updated: 'Përditësuar', completedAt: 'Përfunduar më',
+  total: 'Kafshë të regjistruara', archivedAnimals: 'Kafshë të arkivuara', bySpecies: 'Kafshët sipas llojit',
+  upcomingVaccinations: 'Vaksinimet e ardhshme', upcomingCheckups: 'Kontrollet e ardhshme',
+  recorded: 'Datë nga regjistrimi veterinar', recent: 'Aktiviteti i fundit veterinar', noDates: 'Nuk ka data për 30 ditët e ardhshme.',
+  none: 'Asnjë', invalid: 'Kontrolloni titullin, llojin, kafshën dhe datën.',
+}
+
+const en: typeof sq = {
+  calendar: 'Calendar', add: 'Add task', edit: 'Edit task', save: 'Save task',
+  task: 'Task', title: 'Title', description: 'Description', type: 'Task type', dueDate: 'Due date',
+  vaccination: 'Vaccination', checkup: 'Veterinary checkup', treatmentFollowUp: 'Treatment follow-up', general: 'General farm task',
+  pending: 'Pending', completed: 'Completed', cancelled: 'Cancelled', overdue: 'Overdue',
+  complete: 'Complete task', cancelTask: 'Cancel task', confirmCancel: 'Confirm cancellation', reschedule: 'Reschedule',
+  today: 'Today', week: 'Next 7 days', month: 'Next 30 days', upcoming: 'Upcoming tasks',
+  agenda: 'Daily agenda', previous: 'Previous month', next: 'Next month', chooseDay: 'Agenda date',
+  from: 'From date', to: 'Through date', rangeError: 'The end date must be on or after the start date.',
+  empty: 'No tasks in this view.', missing: 'Task not found.', noAnimal: 'No animal',
+  event: 'Veterinary record', latestEvent: 'Open latest version', currentSourceDate: 'Date on the current record',
+  noSourceDate: 'The current record has no follow-up date.', addReminder: 'Create reminder', reviewReminder: 'Review reminder',
+  confirmReminder: 'Confirm reminder', viewReminder: 'Open reminder', reminderChanged: 'The recorded date changed. Review the current date before confirming.',
+  closed: 'This task is closed.', linked: 'The linked record determines the animal and reminder type.',
+  created: 'Created', updated: 'Updated', completedAt: 'Completed at',
+  total: 'Registered animals', archivedAnimals: 'Archived animals', bySpecies: 'Animals by species',
+  upcomingVaccinations: 'Upcoming vaccinations', upcomingCheckups: 'Upcoming veterinary checkups',
+  recorded: 'Date from the veterinary record', recent: 'Recent veterinary activity', noDates: 'No dates in the next 30 days.',
+  none: 'None', invalid: 'Check the title, type, animal, and date.',
+}
+
+export const taskStrings = { sq, en }
