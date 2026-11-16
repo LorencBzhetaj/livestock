@@ -19,7 +19,7 @@ test('installed shell and local records survive offline navigation and reopen', 
   await page.getByRole('link', { name: 'Cilësimet' }).click()
   await page.getByRole('button', { name: 'Shto të dhënat DEMO' }).click()
   await expect(page.getByText('Të dhënat DEMO janë shtuar në këtë pajisje.')).toBeVisible()
-  await page.getByLabel('Gjuha').selectOption('en')
+  await page.getByLabel('Gjuha', { exact: true }).selectOption('en')
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
   await expect(page.locator('html')).toHaveAttribute('lang', 'en')
 

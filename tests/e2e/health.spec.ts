@@ -35,7 +35,7 @@ test('records Albanian and English visits, vaccination, treatment and an archive
   await expect(page.getByText('Gjetje prove')).toBeVisible()
 
   await page.getByRole('link', { name: 'Cilësimet' }).click()
-  await page.getByLabel('Gjuha').selectOption('en')
+  await page.getByLabel('Gjuha', { exact: true }).selectOption('en')
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
   await openNewEvent(page, profile, 'vaccination')
   await page.getByLabel('Vaccine name').fill('Vaccine Test')
@@ -90,7 +90,7 @@ test('records Albanian and English visits, vaccination, treatment and an archive
 
 test('previews a filtered batch, rejects a stale selection atomically and saves 150 vaccinations offline', async ({ page, context }) => {
   await page.goto('/settings')
-  await page.getByLabel('Gjuha').selectOption('en')
+  await page.getByLabel('Gjuha', { exact: true }).selectOption('en')
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
   await installOffline(page)
   await page.getByRole('link', { name: 'Animals', exact: true }).click()

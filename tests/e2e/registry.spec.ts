@@ -5,7 +5,7 @@ const testPhoto = 'public/icon-192.png'
 
 async function englishOffline(page: Page) {
   await page.goto('/settings')
-  await page.getByLabel('Gjuha').selectOption('en')
+  await page.getByLabel('Gjuha', { exact: true }).selectOption('en')
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true)
   await page.context().setOffline(true)

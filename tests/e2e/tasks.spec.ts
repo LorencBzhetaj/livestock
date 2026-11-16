@@ -25,7 +25,7 @@ test('creates, edits, reschedules, filters, completes and cancels tasks offline 
   const details = page.url()
 
   await page.getByRole('link', { name: 'Cilësimet', exact: true }).click()
-  await page.getByLabel('Gjuha').selectOption('en')
+  await page.getByLabel('Gjuha', { exact: true }).selectOption('en')
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
   await page.goto(details)
   await page.getByRole('link', { name: /Reschedule/ }).click()
@@ -73,7 +73,7 @@ test('creates, edits, reschedules, filters, completes and cancels tasks offline 
 test('shows live counts for 200 animals and creates one confirmed reminder from the latest record offline', async ({ page }) => {
   await page.clock.setFixedTime(instant)
   await page.goto('/settings')
-  await page.getByLabel('Gjuha').selectOption('en')
+  await page.getByLabel('Gjuha', { exact: true }).selectOption('en')
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
   await offline(page)
   await page.getByRole('navigation').getByRole('link', { name: 'Animals', exact: true }).click()

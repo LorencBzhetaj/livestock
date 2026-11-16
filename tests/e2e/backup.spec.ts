@@ -29,7 +29,7 @@ test('downloads and restores an offline backup with preview, photo, language and
   expect(body.counts).toMatchObject({ animals: 3, animalPhotos: 1 })
   await expect(page.getByText(/Shkarkimi u nis · .*KiB/)).toBeVisible()
 
-  await page.getByLabel('Gjuha').selectOption('en')
+  await page.getByLabel('Gjuha', { exact: true }).selectOption('en')
   await expect(page.getByRole('heading', { name: 'Backup & restore' })).toBeVisible()
   await page.getByRole('navigation').getByRole('link', { name: 'Animals' }).click()
   await page.getByRole('link', { name: 'Add animal' }).click()

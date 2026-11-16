@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { normalizeEarTag } from './animalTags'
+import { notificationPreferences, preferenceKey } from '../features/notifications/models'
 
 const id = z.uuid()
 const timestamp = z.iso.datetime()
@@ -61,6 +62,8 @@ export const treatmentSchema = z.strictObject({
 export const settingSchema = z.strictObject({ key: text, value: z.json(), updatedAt: timestamp })
   .refine(({ key, value }) => key !== 'language' || z.enum(languages).safeParse(value).success,
     { path: ['value'], message: 'Unsupported language' })
+  .refine(({ key, value }) => key !== preferenceKey || notificationPreferences.safeParse(value).success,
+    { path: ['value'], message: 'Invalid notification preferences' })
 export const auditEventSchema = z.strictObject({
   id, entityType: text, entityId: id, action: text, occurredAt: timestamp, summary: text,
 })

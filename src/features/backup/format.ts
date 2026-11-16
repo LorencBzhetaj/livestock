@@ -6,6 +6,7 @@ import {
 } from '../../db/models'
 import { veterinaryReceiptSchema } from '../../db/healthModels'
 import { taskSchema } from '../../db/taskModels'
+import { preferenceKey } from '../notifications/models'
 
 export const backupFormat = 'livestockos-backup'
 export const backupVersion = 1
@@ -31,7 +32,7 @@ export const dataSchema = z.strictObject({
   veterinaryOperations: z.array(veterinaryReceiptSchema),
   tasks: z.array(taskSchema),
   settings: z.array(settingSchema.refine(({ key, value }) =>
-    key === 'language' || (key === 'demoSeeded' && typeof value === 'boolean'),
+    key === 'language' || key === preferenceKey || (key === 'demoSeeded' && typeof value === 'boolean'),
   )),
   auditEvents: z.array(auditEventSchema),
 })

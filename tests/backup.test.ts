@@ -84,6 +84,7 @@ async function seed(db: LivestockDatabase, count = 2) {
   await repo.animals.archive(animals[0].id)
   await repo.settings.save({ key: 'language', value: 'en', updatedAt: timestamp })
   await repo.settings.save({ key: 'demoSeeded', value: false, updatedAt: timestamp })
+  await repo.settings.save({ key: 'notificationPreferences', value: { language: 'sq', reminderTime: '08:30', leadDays: 2 }, updatedAt: timestamp })
   await repo.audit.append({ id: newId(), entityType: 'animal', entityId: animals[0].id, action: 'archive',
     occurredAt: timestamp, summary: 'Synthetic audit entry' })
   return { operation, receipt, animal: animals[0], image, eventId }
@@ -97,7 +98,7 @@ test('exports 200 animals and restores every store, photo, amendment, receipt an
   const preview = await previewBackup(file(exported.file))
   expect(preview).toMatchObject({ archived: 1, counts: {
     animals: 200, healthEvents: 202, vaccinations: 201, treatments: 1, animalPhotos: 1, tasks: 2,
-    veterinaryOperations: 3, settings: 2, auditEvents: 1,
+    veterinaryOperations: 3, settings: 3, auditEvents: 1,
   } })
   expect(await createRepositories(target).settings.get('language')).toMatchObject({ value: 'sq' })
   await restoreBackup(target, preview)

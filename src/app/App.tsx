@@ -10,6 +10,7 @@ import { listenForRestore } from '../features/backup/restoreNotice'
 import { pwaStrings } from '../i18n/pwa'
 import { watchPwa, type PwaState } from './pwa'
 
+const NotificationSettings = lazy(() => import('../features/notifications/NotificationSettings'))
 const BackupSettings = lazy(() => import('../features/backup/BackupSettings'))
 const Dashboard = lazy(() => import('../features/tasks/Dashboard'))
 const HealthRoutes = lazy(() => import('../features/health/HealthRoutes'))
@@ -124,6 +125,9 @@ export function App() {
                   <p role="status" className="mt-3">{persistent ? t.storageGranted : t.storageUnavailable}</p>}
               </section>
             </div>
+            <Suspense fallback={<p role="status">{t.loading}</p>}>
+              <NotificationSettings language={language} online={online} />
+            </Suspense>
             <Suspense fallback={<p role="status">{t.loading}</p>}><BackupSettings language={language} /></Suspense>
             {pending && <p role="status" className="mt-4">{t.saving}</p>}
           </>

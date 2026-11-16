@@ -2,13 +2,18 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwind from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { previewPush } from './server/previewPush.js'
 
 export default defineConfig({
   plugins: [
     react(),
+    previewPush(),
     tailwind(),
     VitePWA({
       injectRegister: false,
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'prompt',
       manifest: {
         id: './',
@@ -26,7 +31,7 @@ export default defineConfig({
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
         ],
       },
-      workbox: { skipWaiting: false, clientsClaim: true, globPatterns: ['**/*.{js,css,html,png}'] },
+      injectManifest: { globPatterns: ['**/*.{js,css,html,png}'] },
     }),
   ],
   test: { include: ['tests/**/*.test.{ts,tsx}'] },

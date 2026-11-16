@@ -1,0 +1,4 @@
+{
+  "git": { "deploymentEnabled": { "codex/m7a-web-push": false } },
+  "rewrites": [{ "source": "/((?!api/|assets/|.*\\.).*)", "destination": "/index.html" }]
+}

@@ -80,4 +80,4 @@ Backups are unencrypted private files. Keep copies in locations you control, and
 
 See the [PWA compatibility and update policy](docs/PWA_READINESS.md) and the [physical-device checklist](docs/PHYSICAL_DEVICE_CHECKLIST.md). The physical iPhone, Android, and desktop installation checks remain **NOT TESTED**.
 
-The next milestone is **M7 Optional future features**. See [the roadmap](docs/ROADMAP.md) and [the implementation guidance](AGENTS.md).
+See [M7A Web Push](docs/WEB_PUSH.md) for test-only authorization, environment setup and the device delivery checklist. See [the roadmap](docs/ROADMAP.md) and [the implementation guidance](AGENTS.md).

@@ -38,6 +38,8 @@ private/
 photos/
 farm-records/
 *.backup.json
+*.push-subscription.json
+.vercel/
 *.livestockos.json
 *.csv
 *.tsv
