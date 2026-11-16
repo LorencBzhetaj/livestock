@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 
-test('downloads and restores an offline backup with preview, photo, language and peer-tab refresh', async ({ page, context }) => {
+test('downloads and restores an offline backup with preview, photo, language and preserved peer draft', async ({ page, context }) => {
   await page.goto('/settings')
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true)
   await context.setOffline(true)
@@ -42,24 +42,28 @@ test('downloads and restores an offline backup with preview, photo, language and
   const peer = await context.newPage()
   await peer.goto('/animals')
   await expect(peer.getByRole('link', { name: /SYNTHETIC-LATER/ })).toBeVisible()
+  await peer.getByRole('link', { name: 'Add animal' }).click()
+  await expect(peer.getByRole('heading', { name: 'Add animal' })).toBeVisible()
+  await peer.getByLabel('Ear tag').fill('UNSAVED-PEER-DRAFT')
   await page.getByRole('navigation').getByRole('link', { name: 'Settings' }).click()
   const select = page.getByLabel('Backup file')
   const corrupted = { ...body, checksum: '0'.repeat(64) }
   await select.setInputFiles({ name: 'corrupt.backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(corrupted)) })
   await expect(page.getByRole('alert')).toContainText('Integrity verification failed')
-  await expect(peer.getByRole('link', { name: /SYNTHETIC-LATER/ })).toBeVisible()
+  await expect(peer.getByLabel('Ear tag')).toHaveValue('UNSAVED-PEER-DRAFT')
   await select.setInputFiles({ name: download.suggestedFilename(), mimeType: 'application/json', buffer: bytes })
   await expect(page.getByRole('heading', { name: 'Restore preview' })).toBeVisible()
   await expect(page.getByText('Supported format. SHA-256 verification passed.', { exact: false })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Restore backup' })).toBeDisabled()
-  await expect(peer.getByRole('link', { name: /SYNTHETIC-LATER/ })).toBeVisible()
+  await expect(peer.getByLabel('Ear tag')).toHaveValue('UNSAVED-PEER-DRAFT')
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width)
 
-  const peerReload = peer.waitForEvent('load')
   await page.getByRole('checkbox', { name: 'I confirm replacement of all local application data.' }).check()
   await page.getByRole('button', { name: 'Restore backup' }).click()
   await expect(page.getByText('Të dhënat u rikthyen.', { exact: true })).toBeVisible()
-  await peerReload
+  await expect(peer.getByText(/Të dhënat u rikthyen në një skedë tjetër/)).toBeVisible()
+  await expect(peer.getByLabel('Etiketa e veshit')).toHaveValue('UNSAVED-PEER-DRAFT')
+  await peer.goto('/animals')
   await expect(peer.getByRole('heading', { name: 'Kafshët' })).toBeVisible()
   await expect(peer.getByRole('link', { name: /DEMO-003/ })).toBeVisible()
   await expect(peer.getByRole('link', { name: /SYNTHETIC-LATER/ })).toHaveCount(0)

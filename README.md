@@ -73,9 +73,11 @@ M4 upgrades IndexedDB to v4 in place. Legacy task timestamps are preserved, and 
 
 1. Use a separate test browser profile. Open **Cilësimet → Kopje rezervë dhe rikthim**, download a backup, and note its size.
 2. Add or change a test record, then select the downloaded JSON. Check the preview and confirm that the test change is still present before you confirm replacement.
-3. Confirm replacement and reopen the dashboard and an animal profile. Check original records, photos, and settings. With a second tab open, verify that it reloads and displays the restored state.
+3. Confirm replacement and reopen the dashboard and an animal profile. Check original records, photos, and settings. With a second tab open, verify that it shows a restore notice without discarding an open draft.
 4. Repeat with the production service worker active and the browser offline. Check both interface languages and a 390 px viewport.
 
 Backups are unencrypted private files. Keep copies in locations you control, and test restores with synthetic data. See the [backup format and compatibility policy](docs/BACKUP_AND_SYNC.md).
 
-The next milestone is **M6 Hardening**. See [the roadmap](docs/ROADMAP.md) and [the implementation guidance](AGENTS.md).
+See the [PWA compatibility and update policy](docs/PWA_READINESS.md) and the [physical-device checklist](docs/PHYSICAL_DEVICE_CHECKLIST.md). The physical iPhone, Android, and desktop installation checks remain **NOT TESTED**.
+
+The next milestone is **M7 Optional future features**. See [the roadmap](docs/ROADMAP.md) and [the implementation guidance](AGENTS.md).

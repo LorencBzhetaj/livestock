@@ -8,9 +8,12 @@ export default defineConfig({
     react(),
     tailwind(),
     VitePWA({
+      injectRegister: false,
+      registerType: 'prompt',
       manifest: {
         id: './',
         start_url: './',
+        scope: './',
         name: 'LivestockOS',
         short_name: 'LivestockOS',
         description: 'Menaxhimi i fermës në këtë pajisje',
@@ -23,7 +26,7 @@ export default defineConfig({
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
         ],
       },
-      workbox: { clientsClaim: true, globPatterns: ['**/*.{js,css,html,png}'] },
+      workbox: { skipWaiting: false, clientsClaim: true, globPatterns: ['**/*.{js,css,html,png}'] },
     }),
   ],
   test: { include: ['tests/**/*.test.{ts,tsx}'] },

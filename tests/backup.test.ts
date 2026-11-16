@@ -122,6 +122,8 @@ test('rejects malformed, oversized, unsupported and corrupted files before chang
   await expect(previewBackup(file(JSON.stringify({ ...backup, formatVersion: 999 })))).rejects.toMatchObject({ code: 'version' })
   await expect(previewBackup(file(JSON.stringify({ ...backup, schemaVersion: 999 })))).rejects.toMatchObject({ code: 'version' })
   await expect(previewBackup(file(JSON.stringify({ ...backup, exportedAt: timestamp })))).rejects.toMatchObject({ code: 'checksum' })
+  const formatted = await previewBackup(file(JSON.stringify(backup, null, 2)))
+  expect(formatted.counts.animals).toBe(0)
   expect(await source.animals.count()).toBe(0)
 })
 

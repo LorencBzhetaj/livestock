@@ -2,17 +2,35 @@ import { animalPhotoSchema } from '../../db/models'
 import { BackupError, type BackupData } from './format'
 
 type EncodedPhoto = BackupData['animalPhotos'][number]
+type Base64Bytes = Uint8Array<ArrayBuffer> & { toBase64?: () => string }
+const Base64Array = Uint8Array as typeof Uint8Array & {
+  fromBase64?: (text: string) => Uint8Array<ArrayBuffer>
+}
+
+function encodeBytes(bytes: Base64Bytes) {
+  if (bytes.toBase64) return bytes.toBase64()
+  let binary = ''
+  for (let offset = 0; offset < bytes.length; offset += 16384) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 16384))
+  }
+  return btoa(binary)
+}
+
+function decodeBytes(base64: string, size: number) {
+  if (Base64Array.fromBase64) return Base64Array.fromBase64(base64)
+  const binary = atob(base64)
+  if (binary.length !== size) throw new Error()
+  const bytes = new Uint8Array(size)
+  for (let index = 0; index < size; index++) bytes[index] = binary.charCodeAt(index)
+  return bytes
+}
 
 export async function encodePhoto(photo: unknown): Promise<EncodedPhoto> {
   const { image, animalId } = animalPhotoSchema.parse(photo)
   const bytes = new Uint8Array(await image.arrayBuffer())
   const mimeType = image.type as EncodedPhoto['mimeType']
   verifySignature(bytes, mimeType)
-  let binary = ''
-  for (let offset = 0; offset < bytes.length; offset += 16384) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + 16384))
-  }
-  return { animalId, mimeType, size: bytes.length, base64: btoa(binary) }
+  return { animalId, mimeType, size: bytes.length, base64: encodeBytes(bytes) }
 }
 
 const signatures: Record<EncodedPhoto['mimeType'], number[]> = {
@@ -29,10 +47,8 @@ function verifySignature(bytes: Uint8Array, mimeType: EncodedPhoto['mimeType']) 
 export async function decodePhoto({ animalId, mimeType, size, base64 }: EncodedPhoto) {
   try {
     if (base64.length !== 4 * Math.ceil(size / 3) || !/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) throw new Error()
-    const binary = atob(base64)
-    if (binary.length !== size) throw new Error()
-    const bytes = new Uint8Array(size)
-    for (let index = 0; index < size; index++) bytes[index] = binary.charCodeAt(index)
+    const bytes = decodeBytes(base64, size)
+    if (bytes.length !== size) throw new Error()
     verifySignature(bytes, mimeType)
     const image = new Blob([bytes], { type: mimeType })
     if (typeof Image !== 'undefined') {

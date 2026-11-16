@@ -7,6 +7,8 @@ import { database, repositories, seedDemo } from '../db/repositories'
 import { strings } from '../i18n/strings'
 import { now } from '../lib/identity'
 import { listenForRestore } from '../features/backup/restoreNotice'
+import { pwaStrings } from '../i18n/pwa'
+import { watchPwa, type PwaState } from './pwa'
 
 const BackupSettings = lazy(() => import('../features/backup/BackupSettings'))
 const Dashboard = lazy(() => import('../features/tasks/Dashboard'))
@@ -30,6 +32,8 @@ export function App() {
   const [actionFailed, setActionFailed] = useState(false)
   const [pending, setPending] = useState(false)
   const [persistent, setPersistent] = useState<boolean>()
+  const [pwa, setPwa] = useState<PwaState>('preparing')
+  const [peerRestore, setPeerRestore] = useState(false)
   const language = local?.language ?? 'sq'
   const t = strings[language]
 
@@ -47,7 +51,8 @@ export function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  useEffect(() => listenForRestore(() => window.location.reload()), [])
+  useEffect(() => watchPwa(setPwa), [])
+  useEffect(() => listenForRestore(() => setPeerRestore(true)), [])
 
   useEffect(() => {
     document.documentElement.lang = language
@@ -68,6 +73,8 @@ export function App() {
   return (
     <Shell language={language} online={online}>
       {(readFailed || actionFailed) && <p role="alert" className="mb-5 text-red-800">{t.error}</p>}
+      {pwa === 'waiting' && <p className="panel mb-5" role="status">{pwaStrings[language].waiting}</p>}
+      {peerRestore && <p className="panel mb-5" role="status">{pwaStrings[language].peerRestore}</p>}
       <Routes>
         <Route path="/" element={
           <Suspense fallback={<p role="status">{t.loading}</p>}><Dashboard language={language} /></Suspense>
@@ -108,6 +115,7 @@ export function App() {
                 <h2>{t.storage}</h2>
                 <p className="mt-2">{t.localHelp}</p>
                 <p className="mt-2">{t.storageWarning}</p>
+                {pwa !== 'waiting' && <p className="mt-2 text-sm" role="status">{pwaStrings[language][pwa]}</p>}
                 <button disabled={pending || persistent === true}
                   onClick={() => void perform(async () => setPersistent(await navigator.storage?.persist?.() ?? false))}>
                   {t.requestStorage}

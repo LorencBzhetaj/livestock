@@ -54,7 +54,7 @@ export async function createBackup(db: LivestockDatabase) {
   // Appending the checksum key and hex value adds 78 ASCII bytes.
   if (bytes.length + 78 > maxBackupBytes) throw new BackupError('size')
   const checksum = await sha256(bytes)
-  const file = new Blob([json.slice(0, -1), ',"checksum":"', checksum, '"}'], { type: 'application/json' })
+  const file = new Blob([bytes.subarray(0, -1), ',"checksum":"', checksum, '"}'], { type: 'application/json' })
   return { file, exportedAt, name: 'livestockos-' + exportedAt.replace(/[:.]/g, '-') + '.backup.json' }
 }
 
@@ -63,9 +63,12 @@ export async function previewBackup(file: File): Promise<RestorePreview> {
     throw new BackupError('file')
   }
   if (file.size > maxBackupBytes) throw new BackupError('size')
+  const decoder = new TextDecoder('utf-8', { fatal: true })
   let raw: unknown
+  let bytes: Uint8Array<ArrayBuffer>
   try {
-    raw = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer()))
+    bytes = new Uint8Array(await file.arrayBuffer())
+    raw = JSON.parse(decoder.decode(bytes))
   } catch {
     throw new BackupError('malformed')
   }
@@ -74,8 +77,18 @@ export async function previewBackup(file: File): Promise<RestorePreview> {
   const { formatVersion, schemaVersion: sourceVersion, exportedAt, counts, data, checksum } = header.data
   if (formatVersion !== backupVersion || sourceVersion !== schemaVersion) throw new BackupError('version')
 
-  const body = { ...versionFields, exportedAt, counts: (raw as { counts: unknown }).counts, data }
-  if (await sha256(new TextEncoder().encode(JSON.stringify(body))) !== checksum) throw new BackupError('checksum')
+  const suffix = ',"checksum":"' + checksum + '"}'
+  const suffixStart = bytes.length - suffix.length
+  let matches = false
+  if (suffixStart >= 0 && bytes.subarray(suffixStart).every((byte, index) => byte === suffix.charCodeAt(index))) {
+    // Exported files can be hashed from the input buffer without rebuilding the JSON.
+    bytes[suffixStart] = 125
+    matches = (await sha256(bytes.subarray(0, suffixStart + 1))) === checksum
+  }
+  if (!matches) {
+    const body = { ...versionFields, exportedAt, counts: (raw as { counts: unknown }).counts, data }
+    if (await sha256(new TextEncoder().encode(JSON.stringify(body))) !== checksum) throw new BackupError('checksum')
+  }
   const records = await validateRecords(data)
   const actualCounts = countRecords(records)
   if (collections.some((key) => counts[key] !== actualCounts[key])) throw new BackupError('records')
