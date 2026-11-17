@@ -39,6 +39,8 @@ photos/
 farm-records/
 *.backup.json
 *.push-subscription.json
+*.push-grant
+.pglite/
 .vercel/
 *.livestockos.json
 *.csv

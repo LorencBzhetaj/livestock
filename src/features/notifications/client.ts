@@ -31,6 +31,25 @@ export async function loadPushConfig() {
   return pushConfigSchema.parse(await response.json())
 }
 
+export async function durableAction(body:
+  | { action: 'enroll'; code: string; requestId: string; subscription: PushSubscriptionJSON }
+  | { action: 'revoke' }
+  | { action: 'test'; requestId: string; language: NotificationPreferences['language']; endpointHash: string },
+) {
+  const response = await pushFetch({
+    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }, 20_000)
+  const result: unknown = (await response.json()).status
+  if (response.status === 200 && (result === 'enrolled' || result === 'revoked')) return result
+  if (response.status === 202 && (result === 'serverAccepted' || result === 'providerAccepted')) return result
+  if (response.status === 502 && result === 'providerRejected') return result
+  if (response.status === 410) return 'expired'
+  if (response.status === 429) return 'limited'
+  if ([400, 401, 403, 409].includes(response.status)) return 'rejected'
+  return 'failure'
+}
+
 export async function sendTest(subscription: PushSubscription, token: string, language: NotificationPreferences['language']) {
   const endpointHash = await sha256(new TextEncoder().encode(subscription.endpoint))
   const response = await pushFetch({

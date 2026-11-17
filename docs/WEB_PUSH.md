@@ -45,4 +45,4 @@ Apple documents the Home Screen and user-interaction requirements. Android suppo
 
 ## M7B
 
-First prove authorized real-device delivery. Then design private enrollment and revocation, a shared atomic quota, minimal scheduler inputs, time-zone-aware due times, and deduplication using task ID and revision. Keep the in-app calendar authoritative offline. Require separate approval for any service that receives reminder schedules or synchronized data.
+See the [secure enrollment and delivery guide](WEB_PUSH_M7B.md) for the opt-in durable Preview workflow and device checklist.

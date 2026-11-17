@@ -3,8 +3,9 @@ import type { Language } from '../../db/models'
 import { repositories } from '../../db/repositories'
 import { notificationStrings } from '../../i18n/notifications'
 import { now } from '../../lib/identity'
+import { sha256 } from '../../lib/sha256'
 import { useLocalQuery } from '../animals/shared'
-import { capabilities, loadPushConfig, requestNotificationPermission, sendTest, subscribeDevice } from './client'
+import { capabilities, durableAction, loadPushConfig, requestNotificationPermission, sendTest, subscribeDevice } from './client'
 import { notificationPreferences, preferenceKey } from './models'
 
 const readPreferences = () => repositories.settings.get(preferenceKey)
@@ -20,6 +21,11 @@ export default function NotificationSettings({ language, online }: { language: L
   const preferences = draft ?? notificationPreferences.safeParse(stored?.data?.value).data ??
     { language, reminderTime: '08:00', leadDays: 0 }
   const [token, setToken] = useState('')
+  const [code, setCode] = useState('')
+  const [lastTest, setLastTest] = useState<keyof typeof t>()
+  const [checkingTest, setCheckingTest] = useState(false)
+  const enrollmentAttempt = useRef<string>(undefined)
+  const testAttempt = useRef<{ requestId: string; language: Language }>(undefined)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<keyof typeof t>()
   const [cooldown, setCooldown] = useState(false)
@@ -38,11 +44,16 @@ export default function NotificationSettings({ language, online }: { language: L
 
   useEffect(() => {
     let live = true
-    if (online) void loadPushConfig().then(
-      (value) => { if (live) setConfig(value) },
-      () => { if (live) setConfig(undefined) },
-    )
-    return () => { live = false }
+    function refresh() {
+      const revision = intent.current
+      if (online) void loadPushConfig().then(
+        (value) => { if (live && revision === intent.current) setConfig(value) },
+        () => { if (live && revision === intent.current) setConfig(undefined) },
+      )
+    }
+    refresh()
+    window.addEventListener('focus', refresh)
+    return () => { live = false; window.removeEventListener('focus', refresh) }
   }, [online])
 
   useEffect(() => {
@@ -104,6 +115,66 @@ export default function NotificationSettings({ language, online }: { language: L
     if (remaining) throw new Error('Subscription still active')
   }
 
+  function markEnrollment(enrolled: boolean) {
+    setConfig((current) => current && { ...current, enrolled })
+  }
+
+  function enroll(event: FormEvent) {
+    event.preventDefault()
+    if (!subscription || !online || code.length !== 43) return
+    void action(async () => {
+      enrollmentAttempt.current ??= crypto.randomUUID()
+      const status = await durableAction({
+        action: 'enroll', code, requestId: enrollmentAttempt.current, subscription: subscription.toJSON(),
+      })
+      if (status === 'enrolled') {
+        markEnrollment(true)
+        enrollmentAttempt.current = undefined
+        setCode('')
+      }
+      setNotice(status)
+    })
+  }
+
+  function revoke() {
+    if (!online) return
+    void action(async () => {
+      const status = await durableAction({ action: 'revoke' })
+      if (status === 'revoked') {
+        markEnrollment(false)
+        testAttempt.current = undefined
+        setCheckingTest(false)
+        if (subscription) {
+          try { await remove(subscription) } catch { /* The server has already revoked this device. */ }
+        }
+      }
+      setNotice(status)
+    })
+  }
+
+  function sendDurableTest() {
+    if (!online || !subscription || !config?.enrolled) return
+    void action(async () => {
+      testAttempt.current ??= { requestId: crypto.randomUUID(), language: preferences.language }
+      setCheckingTest(true)
+      let status: Awaited<ReturnType<typeof durableAction>>
+      try {
+        const endpointHash = await sha256(new TextEncoder().encode(subscription.endpoint))
+        status = await durableAction({ action: 'test', ...testAttempt.current, endpointHash })
+      }
+      catch { setLastTest('failure'); return }
+      setLastTest(status)
+      if (status === 'providerAccepted' || status === 'providerRejected' || status === 'rejected' || status === 'expired') {
+        testAttempt.current = undefined
+        setCheckingTest(false)
+      }
+      if (status === 'expired') {
+        markEnrollment(false)
+        try { await remove(subscription) } catch { /* Leave the local subscription visible for manual removal. */ }
+      }
+    })
+  }
+
   function save(event: FormEvent) {
     event.preventDefault()
     void action(async () => {
@@ -124,6 +195,7 @@ export default function NotificationSettings({ language, online }: { language: L
         [t.browser, ability.supported ? t.yes : t.no], [t.standalone, standalone ? t.installed : t.browserTab],
         [t.notificationApi, ability.notification ? t.yes : t.no], [t.pushApi, ability.push ? t.yes : t.no],
         [t.permission, permission ? t[permission] : t.no],
+        [t.enrollment, config?.enrollmentEnabled ? (config.enrolled ? t.enrolled : t.notEnrolled) : t.no],
         [t.subscription, subscription ? t.active : subscription === null ? t.none : ability.supported ? t.checking : t.no],
       ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd className="font-semibold">{value}</dd></div>)}
     </dl>
@@ -133,18 +205,32 @@ export default function NotificationSettings({ language, online }: { language: L
     {ability.supported && online && !config?.publicKey && <p className="mt-3">{t.noKey}</p>}
     <div className="flex flex-wrap gap-2">
       <button disabled={busy || !canEnable} onClick={enable}>{permission === 'granted' && !subscription ? t.finish : t.enable}</button>
-      <button disabled={busy || !subscription} onClick={() => {
+      <button disabled={busy || !subscription || Boolean(config?.enrolled)} onClick={() => {
         if (subscription) void action(async () => { await remove(subscription); setNotice('disabled') })
       }}>{t.disable}</button>
     </div>
-    {subscription && navigator.clipboard && <div className="mt-3">
+    {subscription && config?.testEnabled && !config.enrollmentEnabled && navigator.clipboard && <div className="mt-3">
       <p className="text-sm">{t.private}</p>
       <button disabled={busy} onClick={() => void action(async () => {
         await navigator.clipboard.writeText(JSON.stringify(subscription.toJSON()))
         setNotice('copied')
       })}>{t.copy}</button>
     </div>}
-    {config?.testEnabled ? <form className="mt-4" onSubmit={(event) => {
+    {config?.enrollmentEnabled ? <div className="mt-4">
+      {config.enrolled ? <div className="flex flex-wrap gap-2">
+        <button disabled={busy || !online} onClick={revoke}>{t.revoke}</button>
+        <button disabled={busy || !online || !subscription || permission !== 'granted'} onClick={sendDurableTest}>
+          {checkingTest ? t.checkTest : t.test}
+        </button>
+      </div> : <form onSubmit={enroll}>
+        <label className="grid max-w-md gap-1 text-sm font-semibold">{t.code}
+          <input className="registry-control" type="password" autoComplete="off" value={code} maxLength={43}
+            onChange={(event) => { enrollmentAttempt.current = undefined; setCode(event.currentTarget.value) }} />
+        </label>
+        <button disabled={busy || !online || !subscription || permission !== 'granted' || code.length !== 43}>{t.enroll}</button>
+      </form>}
+      <p className="mt-3" role="status">{t.lastTest} · {t[lastTest ?? config.lastTest ?? 'noTest']}</p>
+    </div> : config?.testEnabled ? <form className="mt-4" onSubmit={(event) => {
       event.preventDefault()
       if (!subscription || !online || cooldown || !token || locked.current) return
       setCooldown(true)
