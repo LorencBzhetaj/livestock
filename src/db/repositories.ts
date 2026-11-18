@@ -1,3 +1,4 @@
+import { farmWrite, journal } from '../features/sync/local'
 import { newId, now } from '../lib/identity'
 import { AnimalTagConflict, importTagIssues } from './animalTags'
 import { speciesCatalog } from './speciesCatalog'
@@ -43,18 +44,19 @@ export function createRepositories(db: LivestockDatabase) {
       get: (id: string) => db.animals.get(id),
       countActive: () => db.animals.where('status').equals('active').count(),
       save: (input: Animal, image?: Blob | null) =>
-        db.transaction('rw', [db.animals, db.species, db.groups, db.animalPhotos], async () => {
+        farmWrite(db, [db.animals, db.species, db.groups, db.animalPhotos], async () => {
           const animal = animalSchema.parse(input)
           const photo = image ? animalPhotoSchema.parse({ animalId: animal.id, image }) : undefined
           const previous = await db.animals.get(animal.id)
           if (previous) animal.createdAt = previous.createdAt
           await checkAnimal(animal)
           await db.animals.put(animal)
+          if (JSON.stringify(previous) !== JSON.stringify(animal)) await journal(db, [{ entity: 'animals', records: [animal] }])
           if (photo) await db.animalPhotos.put(photo)
           if (image === null) await db.animalPhotos.delete(animal.id)
           return animal
         }),
-      import: (inputs: Animal[]) => db.transaction('rw', [db.animals, db.species, db.groups], async () => {
+      import: (inputs: Animal[]) => farmWrite(db, [db.animals, db.species, db.groups], async () => {
         const animals = inputs.map((input) => animalSchema.parse(input))
         const tags = animals.map(({ earTag }) => earTag)
         const existing = await db.animals.where('earTag').anyOf(tags).uniqueKeys()
@@ -63,30 +65,48 @@ export function createRepositories(db: LivestockDatabase) {
         if (conflict !== -1) throw new AnimalTagConflict(tags[conflict])
         for (const animal of animals) await checkAnimal(animal)
         await db.animals.bulkAdd(animals)
+        await journal(db, [{ entity: 'animals', records: animals }])
       }),
-      archive: (id: string) => db.transaction('rw', db.animals, async () => {
+      archive: (id: string) => farmWrite(db, [db.animals], async () => {
         const previous = await db.animals.get(id)
         if (!previous) throw new Error('Animal missing')
         if (previous.status === 'archived') return previous
         const animal = animalSchema.parse({ ...previous, status: 'archived', updatedAt: now() })
         await db.animals.put(animal)
+        await journal(db, [{ entity: 'animals', records: [animal] }])
         return animal
       }),
     },
     species: {
-      ensureCatalog: () => db.transaction('rw', db.species, async () => {
+      ensureCatalog: () => farmWrite(db, [db.species], async () => {
         const existing = await db.species.toArray()
         const missing = speciesCatalog.filter(({ code }) => !existing.some((species) => species.code === code))
         if (missing.length) {
-          await db.species.bulkAdd(missing.map((item) => speciesSchema.parse({ ...item, id: newId() })))
+          const records = missing.map((item) => speciesSchema.parse({ ...item, id: newId() }))
+          await db.species.bulkAdd(records)
+          await journal(db, [{ entity: 'species', records }])
         }
       }),
       list: () => db.species.toArray(),
-      save: (input: Species) => db.species.put(speciesSchema.parse(input)),
+      save: (input: Species) => {
+        const record = speciesSchema.parse(input)
+        return farmWrite(db, [db.species], async () => {
+          await db.species.put(record)
+          await journal(db, [{ entity: 'species', records: [record] }])
+          return record.id
+        })
+      },
     },
     groups: {
       list: () => db.groups.toArray(),
-      save: (input: Group) => db.groups.put(groupSchema.parse(input)),
+      save: (input: Group) => {
+        const record = groupSchema.parse(input)
+        return farmWrite(db, [db.groups], async () => {
+          await db.groups.put(record)
+          await journal(db, [{ entity: 'groups', records: [record] }])
+          return record.id
+        })
+      },
     },
     health,
     tasks,
@@ -108,7 +128,7 @@ export const repositories = createRepositories(database)
 
 export async function seedDemo(db: LivestockDatabase) {
   const repo = createRepositories(db)
-  return db.transaction('rw', [db.animals, db.species, db.groups, db.settings, db.animalPhotos], async () => {
+  return farmWrite(db, [db.animals, db.species, db.groups, db.settings, db.animalPhotos], async () => {
     if (await repo.settings.get('demoSeeded')) return false
     const timestamp = now()
     const goat = await db.species.where('code').equals('goat').first()

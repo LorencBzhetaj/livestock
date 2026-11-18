@@ -1,9 +1,9 @@
-import { schemaVersion, type LivestockDatabase } from '../../db/database'
+import { type LivestockDatabase } from '../../db/database'
 import type { AnimalPhoto } from '../../db/models'
 import { now } from '../../lib/identity'
 import { sha256 } from '../../lib/sha256'
 import {
-  backupVersion, BackupError, collections, countRecords, dataSchema, headerSchema, maxBackupBytes, versionFields,
+  backupVersion, backupSchemaVersion, BackupError, collections, countRecords, dataSchema, headerSchema, maxBackupBytes, versionFields,
   type BackupData, type Collection,
 } from './format'
 import { encodePhoto, decodePhoto } from './photos'
@@ -21,7 +21,7 @@ type RestoreData = Omit<BackupData, 'animalPhotos'> & { animalPhotos: AnimalPhot
 const validated = new WeakMap<RestorePreview, RestoreData>()
 
 function applicationTables(db: LivestockDatabase) {
-  if (db.tables.length !== collections.length || !collections.every((key) => db.tables.some(({ name }) => name === key))) {
+  if (!collections.every((key) => db.tables.some(({ name }) => name === key))) {
     throw new BackupError('version')
   }
   return collections.map((key) => db.table(key))
@@ -75,7 +75,7 @@ export async function previewBackup(file: File): Promise<RestorePreview> {
   const header = headerSchema.safeParse(raw)
   if (!header.success) throw new BackupError('malformed')
   const { formatVersion, schemaVersion: sourceVersion, exportedAt, counts, data, checksum } = header.data
-  if (formatVersion !== backupVersion || sourceVersion !== schemaVersion) throw new BackupError('version')
+  if (formatVersion !== backupVersion || sourceVersion !== backupSchemaVersion) throw new BackupError('version')
 
   const suffix = ',"checksum":"' + checksum + '"}'
   const suffixStart = bytes.length - suffix.length
@@ -106,7 +106,8 @@ export async function restoreBackup(db: LivestockDatabase, preview: RestorePrevi
   if (!records) throw new BackupError('records')
   const tables = applicationTables(db)
   // Every store participates, so IndexedDB serializes peer-tab writes with the replacement.
-  await db.transaction('rw', tables, async () => {
+  await db.transaction('rw', [...tables, db.syncState], async () => {
+    if (await db.syncState.get('farm')) throw new BackupError('syncLinked')
     for (const key of collections) {
       const table = db.table(key)
       await table.clear()

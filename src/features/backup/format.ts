@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { schemaVersion } from '../../db/database'
+export const backupSchemaVersion = 4
 import {
   animalSchema, auditEventSchema, groupSchema, healthEventSchema, maxPhotoBytes, photoTypes,
   settingSchema, speciesSchema, treatmentSchema, vaccinationSchema,
@@ -46,10 +46,10 @@ export const headerSchema = z.strictObject({
   checksum: z.string().regex(/^[0-9a-f]{64}$/),
 })
 
-export const versionFields = { format: backupFormat, formatVersion: backupVersion, schemaVersion } as const
+export const versionFields = { format: backupFormat, formatVersion: backupVersion, schemaVersion: backupSchemaVersion } as const
 
 export class BackupError extends Error {
-  constructor(readonly code: 'file' | 'size' | 'malformed' | 'version' | 'checksum' | 'records' | 'duplicates' | 'relationships' | 'photos') {
+  constructor(readonly code: 'file' | 'size' | 'malformed' | 'version' | 'checksum' | 'records' | 'duplicates' | 'relationships' | 'photos' | 'syncLinked') {
     super(code)
   }
 }

@@ -7,7 +7,7 @@ function day(value: string | undefined) {
   return value.slice(0, 10)
 }
 
-export async function validateReceiptFingerprints(data: BackupData) {
+export async function validateReceiptFingerprints(data: Pick<BackupData, 'healthEvents' | 'vaccinations' | 'treatments' | 'veterinaryOperations'>) {
   const events = new Map(data.healthEvents.map((event) => [event.id, event]))
   const vaccines = new Map(data.vaccinations.map((detail) => [detail.healthEventId, detail]))
   const treatments = new Map(data.treatments.map((detail) => [detail.healthEventId, detail]))

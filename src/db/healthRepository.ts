@@ -1,3 +1,4 @@
+import { farmWrite, journal } from '../features/sync/local'
 import type { LivestockDatabase } from './database'
 import { healthEventSchema, treatmentSchema, vaccinationSchema, type HealthEvent, type Treatment, type Vaccination } from './models'
 import { fingerprintVeterinaryOperation, veterinaryOperationSchema, veterinaryReceiptSchema, type VeterinaryEntry, type VeterinaryOperation } from './healthModels'
@@ -115,7 +116,7 @@ export function createHealthRepository(db: LivestockDatabase) {
       return { event, vaccination, treatment }
     }),
     record: (input: HealthEvent, detail?: Vaccination | Treatment) =>
-      db.transaction('rw', [db.animals, ...records], async () => {
+      farmWrite(db, [db.animals, ...records], async () => {
         const event = healthEventSchema.parse(input)
         if (event.amendsId || event.amendmentReason) throw new VeterinaryConflict('amendment')
         const vaccination = event.kind === 'vaccination' ? vaccinationSchema.parse(detail) : undefined
@@ -128,6 +129,11 @@ export function createHealthRepository(db: LivestockDatabase) {
         await db.healthEvents.add(event)
         if (vaccination) await db.vaccinations.add(vaccination)
         if (treatment) await db.treatments.add(treatment)
+        await journal(db, [
+          { entity: 'healthEvents', records: [event] },
+          { entity: 'vaccinations', records: vaccination ? [vaccination] : [] },
+          { entity: 'treatments', records: treatment ? [treatment] : [] },
+        ])
         return event
       }),
     async submit(input: VeterinaryOperation) {
@@ -135,7 +141,7 @@ export function createHealthRepository(db: LivestockDatabase) {
       // Hash outside IndexedDB so the transaction never waits for Web Crypto.
       const hash = await fingerprintVeterinaryOperation(operation)
       const { animalIds, entry, amendment, batch } = operation
-      return db.transaction('rw', [db.animals, ...records, db.veterinaryOperations], async () => {
+      return farmWrite(db, [db.animals, ...records, db.veterinaryOperations], async () => {
         const prior = await db.veterinaryOperations.get(operation.operationId)
         if (prior) {
           if (prior.fingerprint !== hash) throw new VeterinaryConflict('operation')
@@ -162,6 +168,12 @@ export function createHealthRepository(db: LivestockDatabase) {
         if (entry.kind === 'vaccination') await db.vaccinations.bulkAdd(entries.flatMap(({ vaccination }) => vaccination ? [vaccination] : []))
         if (entry.kind === 'treatment') await db.treatments.bulkAdd(entries.flatMap(({ treatment }) => treatment ? [treatment] : []))
         await db.veterinaryOperations.add(receipt)
+        await journal(db, [
+          { entity: 'healthEvents', records: entries.map(({ event }) => event) },
+          { entity: 'vaccinations', records: entries.flatMap(({ vaccination }) => vaccination ? [vaccination] : []) },
+          { entity: 'treatments', records: entries.flatMap(({ treatment }) => treatment ? [treatment] : []) },
+          { entity: 'veterinaryOperations', records: [receipt] },
+        ])
         return receipt
       })
     },

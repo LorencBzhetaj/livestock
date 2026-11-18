@@ -17,6 +17,7 @@ const sq = {
   records: 'Kopja përmban të dhëna ose numërime të pavlefshme.',
   duplicates: 'Kopja përmban identifikues ose etiketa aktive të përsëritura.',
   relationships: 'Kopja përmban lidhje të pavlefshme mes të dhënave.',
+  syncLinked: 'Kalo në përdorim lokal para se të rikthesh kopjen rezervë.',
   photos: 'Një fotografi ose të dhënat e saj janë të pavlefshme.',
 }
 
@@ -39,6 +40,7 @@ const en: typeof sq = {
   records: 'The backup contains invalid records or record counts.',
   duplicates: 'The backup contains duplicate identifiers or active ear tags.',
   relationships: 'The backup contains invalid record relationships.',
+  syncLinked: 'Switch to local mode before restoring a backup.',
   photos: 'A photograph or its metadata is invalid.',
 }
 

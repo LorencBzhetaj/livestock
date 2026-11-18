@@ -1,4 +1,5 @@
 import Dexie from 'dexie'
+import { farmWrite, journal } from '../features/sync/local'
 import type { LivestockDatabase } from './database'
 import type { createHealthRepository } from './healthRepository'
 import { reminderRequestSchema, taskActionSchema, taskDraftSchema, taskFilterSchema, taskIdSchema, taskSchema,
@@ -39,6 +40,7 @@ export function createTaskRepository(db: LivestockDatabase, health: ReturnType<t
     })
     await checkAnimal(task.animalId)
     await db.tasks.add(task)
+    await journal(db, [{ entity: 'tasks', records: [task] }])
     return task
   }
 
@@ -54,26 +56,28 @@ export function createTaskRepository(db: LivestockDatabase, health: ReturnType<t
       ])
       return { overdue, today: todayCount, week: weekCount, month: monthCount }
     },
-    create: (input: TaskDraft) => db.transaction('rw', [db.tasks, db.animals], async () => await create(input)),
-    edit: (id: string, input: TaskDraft) => db.transaction('rw', [db.tasks, db.animals], async () => {
+    create: (input: TaskDraft) => farmWrite(db, [db.tasks, db.animals], async () => await create(input)),
+    edit: (id: string, input: TaskDraft) => farmWrite(db, [db.tasks, db.animals], async () => {
       const task = await pending(id)
       const draft = taskDraftSchema.parse(input)
       if (task.healthEventId && (draft.animalId !== task.animalId || draft.type !== task.type)) throw new TaskConflict('linked')
       await checkAnimal(draft.animalId)
       const saved = taskSchema.parse({ ...task, ...draft, animalId: draft.animalId, description: draft.description, updatedAt: now() })
       await db.tasks.put(saved)
+      await journal(db, [{ entity: 'tasks', records: [saved] }])
       return saved
     }),
-    finish: (id: string, action: 'completed' | 'cancelled') => db.transaction('rw', db.tasks, async () => {
+    finish: (id: string, action: 'completed' | 'cancelled') => farmWrite(db, [db.tasks], async () => {
       const status = taskActionSchema.parse(action)
       const task = await pending(id)
       const timestamp = now()
       const saved = taskSchema.parse({ ...task, status, updatedAt: timestamp, completedAt: status === 'completed' ? timestamp : undefined })
       await db.tasks.put(saved)
+      await journal(db, [{ entity: 'tasks', records: [saved] }])
       return saved
     }),
     fromEvent: (input: { eventId: string; dueDate: string; title: string }) =>
-      db.transaction('rw', [db.tasks, db.animals, db.healthEvents, db.vaccinations], async () => {
+      farmWrite(db, [db.tasks, db.animals, db.healthEvents, db.vaccinations], async () => {
         const request = reminderRequestSchema.parse(input)
         const source = await health.reminderSource(request.eventId)
         if (!source) throw new TaskConflict('reminderChanged')

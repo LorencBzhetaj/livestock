@@ -27,7 +27,7 @@ test('opens an empty current database and reopens it without mutation', async ()
   await db.open()
   expect(db.verno).toBe(schemaVersion)
   expect(db.tables.map(({ name }) => name).sort()).toEqual([
-    'animalPhotos', 'animals', 'auditEvents', 'groups', 'healthEvents', 'settings', 'species', 'tasks', 'treatments', 'vaccinations', 'veterinaryOperations',
+    'animalPhotos', 'animals', 'auditEvents', 'groups', 'healthEvents', 'settings', 'species', 'syncJournal', 'syncRevisions', 'syncState', 'tasks', 'treatments', 'vaccinations', 'veterinaryOperations',
   ])
   expect(await repo.animals.list()).toEqual([])
   expect(await repo.species.list()).toEqual([])

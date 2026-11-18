@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react'
 import { liveQuery } from 'dexie'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Shell } from '../components/Shell'
 import { type Language } from '../db/models'
 import { database, repositories, seedDemo } from '../db/repositories'
@@ -10,6 +10,7 @@ import { listenForRestore } from '../features/backup/restoreNotice'
 import { pwaStrings } from '../i18n/pwa'
 import { watchPwa, type PwaState } from './pwa'
 
+const SyncPanel = lazy(() => import('../features/sync/SyncPanel'))
 const NotificationSettings = lazy(() => import('../features/notifications/NotificationSettings'))
 const BackupSettings = lazy(() => import('../features/backup/BackupSettings'))
 const Dashboard = lazy(() => import('../features/tasks/Dashboard'))
@@ -27,6 +28,7 @@ function subscribeOnline(onChange: () => void) {
 }
 
 export function App() {
+  const location = useLocation()
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine)
   const [local, setLocal] = useState<{ language: Language; demo: boolean }>()
   const [readFailed, setReadFailed] = useState(false)
@@ -134,6 +136,7 @@ export function App() {
         } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <Suspense fallback={null}><SyncPanel language={language} settings={location.pathname === '/settings'} /></Suspense>
     </Shell>
   )
 }

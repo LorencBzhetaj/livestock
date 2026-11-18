@@ -5,10 +5,14 @@ import type { VeterinaryReceipt } from './healthModels'
 
 import type { Task } from './taskModels'
 import { migrateTask } from './migrateTasks'
+import type { Journal, Revision, SyncState } from '../features/sync/local'
 
-export const schemaVersion = 4
+export const schemaVersion = 5
 
 export class LivestockDatabase extends Dexie {
+  declare syncState: EntityTable<SyncState, 'id'>
+  declare syncJournal: EntityTable<Journal, 'sequence'>
+  declare syncRevisions: EntityTable<Revision, 'id'>
   declare veterinaryOperations: EntityTable<VeterinaryReceipt, 'id'>
   declare animalPhotos: EntityTable<AnimalPhoto, 'animalId'>
   declare species: EntityTable<Species, 'id'>
@@ -45,5 +49,6 @@ export class LivestockDatabase extends Dexie {
     }).upgrade((transaction) => transaction.table('tasks').toCollection().modify((task, context) => {
       context.value = migrateTask(task)
     }))
+    this.version(5).stores({ syncState: 'id', syncJournal: '++sequence, *entities', syncRevisions: 'id' })
   }
 }
