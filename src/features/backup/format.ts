@@ -3,10 +3,10 @@ export const backupSchemaVersion = 4
 import {
   animalSchema, auditEventSchema, groupSchema, healthEventSchema, maxPhotoBytes, photoTypes,
   settingSchema, speciesSchema, treatmentSchema, vaccinationSchema,
-} from '../../db/models'
-import { veterinaryReceiptSchema } from '../../db/healthModels'
-import { taskSchema } from '../../db/taskModels'
-import { preferenceKey } from '../notifications/models'
+} from '../../db/models.js'
+import { veterinaryReceiptSchema } from '../../db/healthModels.js'
+import { taskSchema } from '../../db/taskModels.js'
+import { preferenceKey } from '../notifications/models.js'
 
 export const backupFormat = 'livestockos-backup'
 export const backupVersion = 1

@@ -1,5 +1,5 @@
-import { fingerprintVeterinaryOperation, veterinaryEntrySchema, veterinaryOperationSchema } from '../../db/healthModels'
-import { BackupError, type BackupData } from './format'
+import { fingerprintVeterinaryOperation, veterinaryEntrySchema, veterinaryOperationSchema } from '../../db/healthModels.js'
+import { BackupError, type BackupData } from './format.js'
 
 function day(value: string | undefined) {
   if (!value) return undefined

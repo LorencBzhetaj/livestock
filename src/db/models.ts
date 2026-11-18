@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { normalizeEarTag } from './animalTags'
-import { notificationPreferences, preferenceKey } from '../features/notifications/models'
+import { normalizeEarTag } from './animalTags.js'
+import { notificationPreferences, preferenceKey } from '../features/notifications/models.js'
 
 const id = z.uuid()
 const timestamp = z.iso.datetime()

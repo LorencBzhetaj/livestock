@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { sha256 } from '../lib/sha256'
+import { sha256 } from '../lib/sha256.js'
 
 const required = z.string().trim().min(1)
 const optional = required.optional()
