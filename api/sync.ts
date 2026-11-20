@@ -46,8 +46,10 @@ export function createSyncHandler(store: ReturnType<typeof createSyncStore>, ori
       }
       if (!secret || !authenticatedShape) return reply(response, 401, { error: 'authorization' })
       const result = await store.authorized<object | undefined>(secret, async (sql, device) => {
+        if (device.role === 'VETERINARIAN' && !['session','pull'].includes(input.action)) return { forbidden: true }
         switch (input.action) {
-          case 'session': return { farmId: device.farm_id, identityId: device.identity_id, deviceId: device.id, name: device.name }
+          case 'session': return { farmId: device.farm_id, identityId: device.identity_id, deviceId: device.id, name: device.name,
+            ...(device.role ? {role:device.role,accountId:device.accountId,username:device.username,expiresAt:device.expiresAt} : {}) }
           case 'devices': return { devices: await store.devices(sql, device) }
           case 'invite': return await store.invite(sql, device)
           case 'revoke': return await store.revoke(sql, device, input.deviceId)
@@ -57,6 +59,7 @@ export function createSyncHandler(store: ReturnType<typeof createSyncStore>, ori
       })
       if ('unauthorized' in result) return reply(response, 401, { error: 'authorization' })
       if ('limited' in result) return reply(response, 429, { error: 'limited' })
+      if (result.value && 'forbidden' in result.value) return reply(response, 403, {error:'forbidden'})
       if (!result.value) return reply(response, input.action === 'invite' ? 429 : 409, { error: 'rejected' })
       return reply(response, 200, result.value)
     } catch {
@@ -72,7 +75,7 @@ function configure(env: NodeJS.ProcessEnv) {
     const origin = new URL(env.SYNC_ALLOWED_ORIGIN)
     if (origin.protocol !== 'https:' || origin.origin !== env.SYNC_ALLOWED_ORIGIN || db.protocol !== 'postgresql:'
       || db.searchParams.get('sslmode') !== 'verify-full' || db.username !== 'livestock_sync_runtime') return
-    return createSyncHandler(createSyncStore(postgresTransactions(db.href)), origin.origin)
+    return createSyncHandler(createSyncStore(postgresTransactions(db.href), env.AUTH_ENABLED === '1'), origin.origin)
   } catch { return undefined }
 }
 

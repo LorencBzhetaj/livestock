@@ -44,7 +44,9 @@ export const resultSchema = z.discriminatedUnion('status', [
   }),
 ])
 export const pageSchema = z.strictObject({ changes: z.array(changeSchema).max(100), cursor, more: z.boolean() })
-export const sessionSchema = z.strictObject({ farmId: id, identityId: id, deviceId: id, name: z.string().min(1).max(80) })
+export const sessionSchema = z.strictObject({ farmId: id, identityId: id, deviceId: id, name: z.string().min(1).max(80),
+  role: z.enum(['ADMIN','VETERINARIAN']).optional(), accountId: id.optional(), username: z.string().optional(), expiresAt: z.iso.datetime().optional(),
+})
 export const devicesSchema = z.array(z.strictObject({ id, label: z.string(), revoked: z.boolean(), createdAt: z.iso.datetime() }))
 const code = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
 const label = z.string().trim().min(1).max(80)

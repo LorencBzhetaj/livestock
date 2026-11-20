@@ -1,3 +1,4 @@
+import { getAccess, authRequired } from '../auth/access'
 import { useEffect, useState } from 'react'
 import { liveQuery } from 'dexie'
 import { z } from 'zod'
@@ -58,6 +59,8 @@ const shortName = (payload: unknown) => {
 
 export default function SyncPanel({ language, settings }: { language: Language; settings: boolean }) {
   const t = words[language]
+  const readOnly = getAccess()?.role === 'VETERINARIAN'
+  const accountMode = authRequired()
   const [status, setStatus] = useState<SyncStatus>('unlinked')
   const [state, setState] = useState<SyncState>()
   const [entry, setEntry] = useState<Journal>()
@@ -69,6 +72,14 @@ export default function SyncPanel({ language, settings }: { language: Language; 
   const [pending, setPending] = useState(false)
   const [failed, setFailed] = useState(false)
 
+  useEffect(() => {
+    if (!accountMode) return
+    const identity = getAccess()
+    if (!identity) return
+    void recoverSession(database, identity).then(() => {
+      window.dispatchEvent(new Event('livestock-sync'))
+    }).catch(() => setFailed(true))
+  }, [accountMode])
   useEffect(() => watchSync(database, setStatus), [])
   useEffect(() => {
     const sub = liveQuery(async () => ({
@@ -99,7 +110,7 @@ export default function SyncPanel({ language, settings }: { language: Language; 
     <p role="status">{t[status]}</p>
     <p className="text-sm">{t.photos}</p>
     {failed && <p role="alert" className="text-red-800">{t.actionError}</p>}
-    {(!state || status === 'failed') && <form className="mt-3 grid gap-2" onSubmit={(event) => {
+    {!accountMode && (!state || status === 'failed') && <form className="mt-3 grid gap-2" onSubmit={(event) => {
       event.preventDefault()
       void perform(async () => {
         const session = await enroll(code.trim(), label.trim())
@@ -133,13 +144,13 @@ export default function SyncPanel({ language, settings }: { language: Language; 
     {state && <>
       <p>{state.name}</p>
       <button disabled={pending} onClick={wake}>{t.sync}</button>
-      <button disabled={pending} onClick={() => void perform(async () => setInviteCode((await invite()).code))}>{t.invite}</button>
+      {!accountMode && <button disabled={pending} onClick={() => void perform(async () => setInviteCode((await invite()).code))}>{t.invite}</button>}
       {inviteCode && <div><output className="break-all">{inviteCode}</output><button onClick={() => setInviteCode('')}>{t.hide}</button></div>}
-      <button disabled={pending} onClick={() => void perform(async () => {
+      {!readOnly && <button disabled={pending} onClick={() => void perform(async () => {
         const result = await request({ action: 'devices' }, z.object({ devices: devicesSchema }))
         setDevices(result.devices)
-      })}>{t.devices}</button>
-      {devices && <ul>{devices.map((device) => <li key={device.id}>
+      })}>{t.devices}</button>}
+      {!readOnly && devices && <ul>{devices.map((device) => <li key={device.id}>
         {device.label} {device.revoked ? t.revoked : device.id !== state.deviceId &&
           <button disabled={pending} onClick={() => void perform(async () => {
             await revoke(device.id)
@@ -147,9 +158,9 @@ export default function SyncPanel({ language, settings }: { language: Language; 
           })}>{t.revoke}</button>}
       </li>)}</ul>}
       <p className="text-sm">{t.detachHelp}</p>
-      <button disabled={pending || Boolean(entry)} onClick={() => void perform(() => detach(database))}>{t.detach}</button>
+      {!readOnly && <button disabled={pending || Boolean(entry)} onClick={() => void perform(() => detach(database))}>{t.detach}</button>}
     </>}
-    {entry?.status === 'conflict' && entry.conflict && <article className="mt-4 border-t pt-3">
+    {!readOnly && entry?.status === 'conflict' && entry.conflict && <article className="mt-4 border-t pt-3">
       <h3>{t.conflict}</h3>
       <p>{t[entry.conflict.reason]}</p>
       <details><summary>{t.draft}</summary><pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify(entry.operation.mutations.map((m) => m.payload), null, 2)}</pre></details>

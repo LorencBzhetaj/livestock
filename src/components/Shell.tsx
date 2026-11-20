@@ -1,3 +1,4 @@
+import { getAccess } from '../features/auth/access'
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import { animalStrings } from '../i18n/animals'
@@ -31,7 +32,7 @@ export function Shell({ language, online, children }: {
           <NavLink to="/animals">{animalStrings[language].registry}</NavLink>
           <NavLink to="/veterinary">{healthStrings[language].veterinary}</NavLink>
           <NavLink to="/tasks">{taskStrings[language].calendar}</NavLink>
-          <NavLink to="/settings">{t.settings}</NavLink>
+          {getAccess()?.role !== 'VETERINARIAN' && <NavLink to="/settings">{t.settings}</NavLink>}
         </nav>
       </header>
       <main id="main" tabIndex={-1} className="mx-auto max-w-5xl px-5 py-10 sm:px-8 sm:py-14">

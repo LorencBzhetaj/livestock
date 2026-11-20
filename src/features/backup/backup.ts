@@ -1,3 +1,4 @@
+import { assertAdmin } from '../auth/access'
 import { type LivestockDatabase } from '../../db/database'
 import type { AnimalPhoto } from '../../db/models'
 import { now } from '../../lib/identity'
@@ -36,6 +37,7 @@ async function validateRecords(raw: unknown) {
 }
 
 export async function createBackup(db: LivestockDatabase) {
+  assertAdmin()
   const tables = applicationTables(db)
   const snapshot = await db.transaction('r', tables, async () => {
     const rows = await Promise.all(tables.map(async (table) => [table.name, await table.toArray()]))

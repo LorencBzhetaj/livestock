@@ -1,5 +1,7 @@
 # M8 multi-device synchronization
 
+The authenticated Preview now uses username/password ADMIN and VETERINARIAN accounts. See [account setup and access rules](ACCOUNTS.md) for the active sign-in flow. The enrollment-grant procedure below documents the earlier M8 setup.
+
 ## Deployment status
 
 The application keeps working in IndexedDB without a remote connection. An opt-in M8 Vercel Preview needs a separately reviewed PostgreSQL environment. Use an isolated database and synthetic records for validation. The existing M7B runtime and production schema are outside this migration. Automatic Git deployments are disabled for the M8 branch.

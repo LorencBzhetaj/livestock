@@ -10,7 +10,8 @@ const tables: Record<Entity, string> = {
 }
 export const token = () => randomBytes(32).toString('base64url')
 export const hash = (value: string) => createHash('sha256').update(value).digest('hex')
-type Device = { id: string; farm_id: string; identity_id: string; name: string }
+export type Device = { id: string; farm_id: string; identity_id: string; name: string;
+ role?: 'ADMIN'|'VETERINARIAN'; accountId?:string; username?:string; expiresAt?:string }
 type RecordState = { version: string | number; payload: unknown }
 
 async function allowed(sql: Sql, scope: string, maximum: number) {
@@ -101,6 +102,7 @@ async function dependencies(sql: Sql, farm: string, operation: Operation) {
 }
 
 async function push(sql: Sql, device: Device, operation: Operation) {
+  if (device.role === 'VETERINARIAN') return undefined
   if (operation.farmId !== device.farm_id || operation.deviceId !== device.id) return undefined
   const farm = device.farm_id
   const fingerprint = hash(JSON.stringify({ ...operation, deviceId: null }))
@@ -183,7 +185,7 @@ async function push(sql: Sql, device: Device, operation: Operation) {
   }
 }
 
-export function createSyncStore(transaction: Transaction) {
+export function createSyncStore(transaction: Transaction, accountAuth = false) {
   function transact<T>(work: (sql: Sql) => Promise<T>) {
     return transaction(async (sql) => {
       await sql.query('SET LOCAL search_path TO livestock_sync, pg_catalog')
@@ -192,6 +194,7 @@ export function createSyncStore(transaction: Transaction) {
   }
   return {
     enroll: (code: string, label: string) => transact(async (sql) => {
+      if (accountAuth) return undefined
       if (!await allowed(sql, 'enroll', 30)) return { limited: true as const }
       const grant = (await sql.query<{ farm_id: string; identity_id: string }>(
         'UPDATE enrollment SET used_at=now() WHERE code_digest=$1 AND used_at IS NULL AND expires_at>now() RETURNING farm_id,identity_id',
@@ -208,15 +211,22 @@ export function createSyncStore(transaction: Transaction) {
     authorized: <T>(secret: string, work: (sql: Sql, device: Device) => Promise<T>) => transact(async (sql) => {
       const digest = hash(secret)
       const device = (await sql.query<Device>(
-        `SELECT d.id,d.farm_id,d.identity_id,f.name FROM devices d JOIN farms f ON f.id=d.farm_id
-         JOIN farm_members m ON m.farm_id=d.farm_id AND m.identity_id=d.identity_id
-         WHERE d.token_digest=$1 AND d.revoked_at IS NULL AND d.created_at>now()-interval '90 days'`, [digest],
+        accountAuth
+          ? `SELECT d.id,d.farm_id,d.identity_id,f.name,a.role,a.id AS "accountId",a.username,d.expires_at AS "expiresAt"
+             FROM devices d JOIN farms f ON f.id=d.farm_id
+             JOIN farm_members m ON m.farm_id=d.farm_id AND m.identity_id=d.identity_id
+             JOIN accounts a ON a.id=d.account_id AND a.farm_id=d.farm_id AND a.identity_id=d.identity_id
+             WHERE d.token_digest=$1 AND d.revoked_at IS NULL AND d.expires_at>now() AND a.enabled`
+          : `SELECT d.id,d.farm_id,d.identity_id,f.name FROM devices d JOIN farms f ON f.id=d.farm_id
+             JOIN farm_members m ON m.farm_id=d.farm_id AND m.identity_id=d.identity_id
+             WHERE d.token_digest=$1 AND d.revoked_at IS NULL AND d.created_at>now()-interval '90 days'`, [digest],
       )).rows[0]
       if (!device) return { unauthorized: true as const }
       // Serialize version allocation and revocation for each farm, including across serverless instances.
       await sql.query('SELECT id FROM farms WHERE id=$1 FOR UPDATE', [device.farm_id])
       const active = await sql.query('SELECT 1 FROM devices d JOIN farm_members m USING (farm_id,identity_id) WHERE d.id=$1 AND revoked_at IS NULL', [device.id])
       if (!active.rows.length) return { unauthorized: true as const }
+      if (device.expiresAt) device.expiresAt = new Date(device.expiresAt).toISOString()
       if (!await allowed(sql, device.farm_id, 300)) return { limited: true as const }
       return { value: await work(sql, device) }
     }),
@@ -230,10 +240,13 @@ export function createSyncStore(transaction: Transaction) {
       return { changes, cursor: changes.at(-1)?.cursor ?? cursor, more: result.rows.length > limit }
     },
     devices: async (sql: Sql, device: Device) => (await sql.query<{ id: string; label: string; revoked: boolean; createdAt: Date }>(
-      'SELECT id,label,revoked_at IS NOT NULL AS revoked,created_at AS "createdAt" FROM devices WHERE farm_id=$1 AND identity_id=$2 ORDER BY created_at',
-      [device.farm_id, device.identity_id],
+      accountAuth
+        ? 'SELECT id,label,revoked_at IS NOT NULL AS revoked,created_at AS "createdAt" FROM devices WHERE farm_id=$1 ORDER BY created_at'
+        : 'SELECT id,label,revoked_at IS NOT NULL AS revoked,created_at AS "createdAt" FROM devices WHERE farm_id=$1 AND identity_id=$2 ORDER BY created_at',
+      accountAuth ? [device.farm_id] : [device.farm_id, device.identity_id],
     )).rows.map((row) => ({ ...row, createdAt: new Date(row.createdAt).toISOString() })),
     invite: async (sql: Sql, device: Device) => {
+      if (accountAuth || device.role === 'VETERINARIAN') return undefined
       if (!await allowed(sql, 'invite:' + device.farm_id, 3)) return undefined
       const code = token()
       await sql.query("INSERT INTO enrollment (code_digest,farm_id,identity_id,expires_at) VALUES ($1,$2,$3,now()+interval '15 minutes')",
@@ -241,8 +254,11 @@ export function createSyncStore(transaction: Transaction) {
       return { code }
     },
     revoke: async (sql: Sql, device: Device, target: string) => {
-      await sql.query('UPDATE devices SET revoked_at=now() WHERE farm_id=$1 AND identity_id=$2 AND id=$3 AND revoked_at IS NULL',
-        [device.farm_id, device.identity_id, target])
+      if (device.role === 'VETERINARIAN') return undefined
+      await sql.query(accountAuth
+        ? 'UPDATE devices SET revoked_at=now() WHERE farm_id=$1 AND id=$2 AND revoked_at IS NULL'
+        : 'UPDATE devices SET revoked_at=now() WHERE farm_id=$1 AND id=$2 AND identity_id=$3 AND revoked_at IS NULL',
+        accountAuth ? [device.farm_id, target] : [device.farm_id, target, device.identity_id])
       return { revoked: true }
     },
   }

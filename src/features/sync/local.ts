@@ -1,3 +1,4 @@
+import { permitRemoteTransaction } from '../auth/access'
 import type { Table } from 'dexie'
 import type { LivestockDatabase } from '../../db/database'
 import { dataSchema } from '../backup/format'
@@ -117,6 +118,7 @@ function canonical(value: unknown): string {
 
 export async function connectLocal(db: LivestockDatabase, session: Session, reviewed: Mutation[], remote: Change[], cursor: string) {
   await farmWrite(db, sharedTables(db), async () => {
+    permitRemoteTransaction()
     if (await db.syncState.get('farm')) throw new Error('Device already linked')
     const local = await localSnapshot(db)
     if (canonical(local) !== canonical(reviewed)) throw new Error('Local records changed after review')
@@ -163,6 +165,7 @@ async function apply(db: LivestockDatabase, change: Change) {
 
 export async function applyPage(db: LivestockDatabase, session: Session, from: string, page: Page) {
   await farmWrite(db, sharedTables(db), async () => {
+    permitRemoteTransaction()
     const state = await db.syncState.get('farm')
     if (!state || state.farmId !== session.farmId || state.deviceId !== session.deviceId || state.cursor !== from) return
     let prior = BigInt(from)
@@ -242,6 +245,7 @@ export async function resolve(db: LivestockDatabase, sequence: number, choice: '
 
 export async function recoverSession(db: LivestockDatabase, session: Session) {
   await db.transaction('rw', db.syncState, db.syncJournal, async () => {
+    permitRemoteTransaction()
     const state = await db.syncState.get('farm')
     if (!state || state.deviceId === session.deviceId) return
     if (state.farmId !== session.farmId || state.identityId !== session.identityId) throw new Error('Mismatched owner session')

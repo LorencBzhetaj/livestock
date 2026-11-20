@@ -1,3 +1,4 @@
+import { getAccess } from '../features/auth/access'
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react'
 import { liveQuery } from 'dexie'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
@@ -28,6 +29,7 @@ function subscribeOnline(onChange: () => void) {
 }
 
 export function App() {
+  const readOnly = getAccess()?.role === 'VETERINARIAN'
   const location = useLocation()
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine)
   const [local, setLocal] = useState<{ language: Language; demo: boolean }>()
@@ -78,6 +80,7 @@ export function App() {
       {(readFailed || actionFailed) && <p role="alert" className="mb-5 text-red-800">{t.error}</p>}
       {pwa === 'waiting' && <p className="panel mb-5" role="status">{pwaStrings[language].waiting}</p>}
       {peerRestore && <p className="panel mb-5" role="status">{pwaStrings[language].peerRestore}</p>}
+      <fieldset disabled={readOnly} className="m-0 min-w-0 border-0 p-0">
       <Routes>
         <Route path="/" element={
           <Suspense fallback={<p role="status">{t.loading}</p>}><Dashboard language={language} /></Suspense>
@@ -91,7 +94,7 @@ export function App() {
         <Route path="/veterinary/*" element={
           <Suspense fallback={<p role="status">{t.loading}</p>}><HealthRoutes language={language} /></Suspense>
         } />
-        <Route path="/settings" element={
+        <Route path="/settings" element={readOnly ? <Navigate to="/" replace /> :
           <>
             <h1>{t.settings}</h1>
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -136,7 +139,8 @@ export function App() {
         } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <Suspense fallback={null}><SyncPanel language={language} settings={location.pathname === '/settings'} /></Suspense>
+      </fieldset>
+      <Suspense fallback={null}><SyncPanel language={language} settings={location.pathname === '/settings' || readOnly} /></Suspense>
     </Shell>
   )
 }

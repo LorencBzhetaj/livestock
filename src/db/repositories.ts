@@ -1,3 +1,4 @@
+import { localDatabaseName, assertAdmin, getAccess } from '../features/auth/access'
 import { farmWrite, journal } from '../features/sync/local'
 import { newId, now } from '../lib/identity'
 import { AnimalTagConflict, importTagIssues } from './animalTags'
@@ -79,6 +80,7 @@ export function createRepositories(db: LivestockDatabase) {
     },
     species: {
       ensureCatalog: () => farmWrite(db, [db.species], async () => {
+        if (getAccess()?.role === 'VETERINARIAN') return
         const existing = await db.species.toArray()
         const missing = speciesCatalog.filter(({ code }) => !existing.some((species) => species.code === code))
         if (missing.length) {
@@ -113,7 +115,10 @@ export function createRepositories(db: LivestockDatabase) {
     dashboard: createDashboardRepository(db, health, tasks),
     settings: {
       get: (key: string) => db.settings.get(key),
-      save: (input: Setting) => db.settings.put(settingSchema.parse(input)),
+      save: (input: Setting) => {
+        if (input.key !== 'language') assertAdmin()
+        return db.settings.put(settingSchema.parse(input))
+      },
     },
     audit: {
       list: (entityType: string, entityId: string) =>
@@ -123,7 +128,7 @@ export function createRepositories(db: LivestockDatabase) {
   }
 }
 
-export const database = new LivestockDatabase()
+export const database = new LivestockDatabase(localDatabaseName())
 export const repositories = createRepositories(database)
 
 export async function seedDemo(db: LivestockDatabase) {

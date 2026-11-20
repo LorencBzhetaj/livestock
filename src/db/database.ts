@@ -1,3 +1,4 @@
+import { assertLocalMutation, assertRead } from '../features/auth/access'
 import Dexie, { type EntityTable } from 'dexie'
 import type { Animal, AnimalPhoto, AuditEvent, Group, HealthEvent, Setting, Species, Treatment, Vaccination } from './models'
 
@@ -27,6 +28,28 @@ export class LivestockDatabase extends Dexie {
 
   constructor(name = 'livestockos') {
     super(name)
+    this.use({
+      stack: 'dbcore',
+      name: 'AccountPermissions',
+      create: (core) => ({
+        ...core,
+        table: (tableName) => {
+          const table = core.table(tableName)
+          return {
+            ...table,
+            mutate: (req) => {
+              try { assertLocalMutation(req.trans, tableName, 'values' in req ? req.values : undefined, name) } catch (error) { return Promise.reject(error) }
+              return table.mutate(req)
+            },
+            get: (req) => { assertRead(name); return table.get(req) },
+            getMany: (req) => { assertRead(name); return table.getMany(req) },
+            query: (req) => { assertRead(name); return table.query(req) },
+            count: (req) => { assertRead(name); return table.count(req) },
+            openCursor: (req) => { assertRead(name); return table.openCursor(req) },
+          }
+        },
+      }),
+    })
     this.version(1).stores({
       species: 'id, code',
       animals: 'id, earTag, speciesId, status, groupId, [status+earTag]',

@@ -5,6 +5,7 @@ import { createDurablePushHandler } from '../server/durablePush.js'
 import { postgresTransactions } from '../server/pushDatabase.js'
 import { createPushStore } from '../server/pushStore.js'
 import { deliverPush } from '../server/deliverPush.js'
+import { createAuthStore, readCookie } from '../server/authStore.js'
 import { pushSecrets, tokenSchema } from '../server/pushSecurity.js'
 
 function configure(env: NodeJS.ProcessEnv) {
@@ -30,7 +31,18 @@ function configure(env: NodeJS.ProcessEnv) {
 
 const durable = configure(process.env)
 
-export default function handler(request: IncomingMessage, response: ServerResponse) {
+const accountStore = process.env.AUTH_ENABLED === '1' && process.env.SYNC_DATABASE_URL
+  ? createAuthStore(postgresTransactions(process.env.SYNC_DATABASE_URL)) : undefined
+
+export default async function handler(request: IncomingMessage, response: ServerResponse) {
+  if (accountStore && request.method === 'POST') {
+    try {
+      const token = readCookie(request.headers.cookie)
+      const actor = token && await accountStore.session(token)
+      if (!actor) return reply(response, 401, {status:'unauthorized'})
+      if (actor.role !== 'ADMIN') return reply(response, 403, {status:'forbidden'})
+    } catch { return reply(response, 503, {status:'unavailable'}) }
+  }
   if (durable) return durable(request, response)
   if (request.method === 'GET') return reply(response, 200, { publicKey: publicPushKey(process.env), testEnabled: false })
   return reply(response, request.method === 'POST' ? 503 : 405, { status: 'unavailable' })

@@ -30,6 +30,7 @@ export function watchSync(db: LivestockDatabase, update: (status: SyncStatus) =>
     update('working')
     const session = await getSession()
     if (session.farmId !== state.farmId || session.deviceId !== state.deviceId || session.identityId !== state.identityId) throw new Error('The local device does not match its session')
+    if (session.role === 'VETERINARIAN' && entry) throw new Error('Read-only account has pending edits')
     for (let count = 0; entry && count < 30 && !disposed; count++) {
       if (entry.status === 'conflict') return update('conflict')
       if (entry.retryAt > Date.now()) {
