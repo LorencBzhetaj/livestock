@@ -2,6 +2,12 @@
 
 An Albanian-first, offline-first livestock register for a private farm. The first release supports a single local workspace and a database that can represent goats, sheep, cattle and other species.
 
+## Sign in to M8 Preview
+
+Open the protected Preview and sign in with `adi` and the existing Admin password. Keep **Mbaje mend këtë pajisje / Remember this device** selected on a private device. Normal sign-in needs no setup code. To activate `vet`, open **Cilësimet / Settings → Llogaria e veterinerit / Veterinarian account**, choose a password of at least 12 characters and confirm with the Admin password. The veterinarian can view farm records but cannot change them.
+
+On iPhone, open the same Preview in Safari, choose **Share → Add to Home Screen**, launch the installed app and sign in with the same account. On a new device, review the farm records and confirm once before synchronization starts. Synchronization then runs on opening, reconnecting, returning to the app and saving changes. Pending offline changes are retained. Photographs remain local and in backups. See [account security and cache behavior](docs/ACCOUNTS.md).
+
 ## Run locally
 
 Use Node.js 24 LTS and npm. Install the locked dependencies once with internet access.

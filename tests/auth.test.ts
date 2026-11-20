@@ -100,6 +100,33 @@ test('server rejects Vet mutations with HTTP 403 while pull remains authorized',
  }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()))}
 },30000)
 
+test('same Admin credentials enroll separate devices into the same farm without another setup code',async()=>{
+ const desktop=await auth.execute({action:'login',username:'adi',password,remember:true,label:'PC'},undefined,'pc')
+ const phone=await auth.execute({action:'login',username:'adi',password,remember:true,label:'iPhone'},undefined,'phone')
+ expect(desktop.status).toBe(200)
+ expect(phone.status).toBe(200)
+ const first=desktop.value as AuthSession,second=phone.value as AuthSession
+ expect(first.farmId).toBe(second.farmId)
+ expect(first.accountId).toBe(second.accountId)
+ expect(first.identityId).toBe(second.identityId)
+ expect(first.deviceId).not.toBe(second.deviceId)
+ expect(await auth.session(resultCookie(desktop))).toMatchObject({role:'ADMIN',farmId:farm})
+ expect(await auth.session(resultCookie(phone))).toMatchObject({role:'ADMIN',farmId:farm})
+ const species={id:id(),code:'goat',active:true,displayNameSq:'Dhi',displayNameEn:'Goat'}
+ const operation={id:id(),farmId:farm,deviceId:first.deviceId,createdAt:new Date().toISOString(),initial:true,
+  mutations:[{entity:'species' as const,recordId:species.id,type:'create' as const,base:0,payload:species}]}
+ const submit=()=>sync.authorized(resultCookie(desktop),(sql,device)=>sync.push(sql,device,operation))
+ const saved=await submit()
+ expect(saved).toMatchObject({value:{status:'applied'}})
+ expect(await submit()).toEqual(saved)
+ const received=await sync.authorized(resultCookie(phone),(sql,device)=>sync.pull(sql,device,'0',100))
+ expect(received).toMatchObject({value:{changes:[{entity:'species',recordId:species.id,payload:species}]}})
+ await sync.authorized(resultCookie(desktop),(sql,device)=>sync.revoke(sql,device,second.deviceId))
+ expect(await auth.session(resultCookie(phone))).toBeUndefined()
+ expect(await auth.session(resultCookie(desktop))).toBeDefined()
+ expect((await auth.execute({action:'status'},undefined,'anonymous')).value).toEqual({setupAvailable:false})
+},30000)
+
 test('offline Vet denies repository and direct table writes, export, and reads after local lock',async()=>{
  const db=new LivestockDatabase('auth-local-'+id())
  const account={...issued.session,role:'ADMIN'} as AuthSession
