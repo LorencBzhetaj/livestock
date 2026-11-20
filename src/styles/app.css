@@ -77,7 +77,7 @@ label{font-weight:500;font-size:.9rem}textarea{min-height:110px}
  .account-toolbar{position:static;width:auto;padding:8px 18px;margin:0;background:#183e30;align-items:center;justify-content:flex-end}.account-toolbar>span{margin-right:auto}.account-toolbar select{max-width:90px}
  .account-panel{inset:80px 18px auto;max-width:none}
  .auth-page{display:block}.auth-aside{padding:25px 24px 30px}.auth-aside .brand{font-size:1.25rem}.auth-message{padding:25px 0 0;margin:0}.auth-message h2{font-size:1.8rem;max-width:280px}.auth-message p,.auth-aside small{display:none}
- .auth-main{padding:38px 24px 60px;align-items:flex-start}.auth-language{top:-85px;right:24px;background:#244b38;border-color:#67806b;color:#fff}.auth-form h1{font-size:1.6rem}.auth-form form{gap:18px}
+ .auth-main{padding:24px 24px 60px;align-items:center;flex-direction:column}.auth-language{position:static;align-self:flex-end;margin:0 0 24px;background:#fff;border-color:#a7b9ab;color:#194d3b}.auth-form h1{font-size:1.6rem}.auth-form form{gap:18px}
  .profile-card{grid-template-columns:1fr;gap:20px}.profile-portrait{max-height:240px;aspect-ratio:4/3}.profile-placeholder{min-height:160px}
 }
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
