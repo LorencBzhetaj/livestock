@@ -84,7 +84,7 @@ test('records Albanian and English visits, vaccination, treatment and an archive
   const reopened = await context.newPage()
   await reopened.goto(profile)
   await expect(reopened.getByRole('region', { name: 'Veterinary history' }).getByRole('listitem')).toHaveCount(4)
-  await expect(reopened.getByText('Offline · This device only')).toBeVisible()
+  await expect(reopened.locator('.sync-inline')).toContainText('Offline')
   expect(await reopened.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(reopened.viewportSize()!.width)
 })
 

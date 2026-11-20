@@ -1,3 +1,4 @@
+import {getAccess} from '../auth/access'
 import { useCallback, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import type { Language } from '../../db/models'
@@ -70,7 +71,7 @@ export function CalendarPage({ language }: { language: Language }) {
     <div className="registry">
       <div className="registry-heading">
         <h1>{t.calendar}</h1>
-        <Link to={'/tasks/new?date=' + day} className="registry-action">{t.add}</Link>
+        {getAccess()?.role!=='VETERINARIAN'&&<Link to={'/tasks/new?date=' + day} className="registry-action">{t.add}</Link>}
       </div>
       <section className="panel mt-6">
         <div className="grid gap-3 sm:grid-cols-3">

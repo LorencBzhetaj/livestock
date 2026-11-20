@@ -80,7 +80,8 @@ export function App() {
       {(readFailed || actionFailed) && <p role="alert" className="mb-5 text-red-800">{t.error}</p>}
       {pwa === 'waiting' && <p className="panel mb-5" role="status">{pwaStrings[language].waiting}</p>}
       {peerRestore && <p className="panel mb-5" role="status">{pwaStrings[language].peerRestore}</p>}
-      <fieldset disabled={readOnly} className="m-0 min-w-0 border-0 p-0">
+      <Suspense fallback={null}><SyncPanel language={language} settings={location.pathname === '/settings'} /></Suspense>
+      <fieldset disabled={readOnly && /\/(new|edit|import|batch|amend)(\/|$)/.test(location.pathname)} className="m-0 min-w-0 border-0 p-0">
       <Routes>
         <Route path="/" element={
           <Suspense fallback={<p role="status">{t.loading}</p>}><Dashboard language={language} /></Suspense>
@@ -119,7 +120,7 @@ export function App() {
               </section>
               <section className="panel">
                 <h2>{t.storage}</h2>
-                <p className="mt-2">{t.localHelp}</p>
+                <p className="mt-2">{getAccess()?(language==='sq'?'Puno edhe pa internet. Këtu mund të kontrollosh gjendjen e të dhënave të tua.':'Keep working offline. Check the status of your records here.'):t.localHelp}</p>
                 <p className="mt-2">{t.storageWarning}</p>
                 {pwa !== 'waiting' && <p className="mt-2 text-sm" role="status">{pwaStrings[language][pwa]}</p>}
                 <button disabled={pending || persistent === true}
@@ -140,7 +141,7 @@ export function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </fieldset>
-      <Suspense fallback={null}><SyncPanel language={language} settings={location.pathname === '/settings' || readOnly} /></Suspense>
+
     </Shell>
   )
 }

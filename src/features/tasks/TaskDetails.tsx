@@ -1,3 +1,4 @@
+import {getAccess} from '../auth/access'
 import { useCallback, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { Language } from '../../db/models'
@@ -70,7 +71,7 @@ export function TaskDetails({ language, editing = false }: { language: Language;
         <div className="text-sm"><dt>{t.updated}</dt><dd>{displayTimestamp(task.updatedAt, language)}</dd></div>
         {task.completedAt && <div className="text-sm"><dt>{t.completedAt}</dt><dd>{displayTimestamp(task.completedAt, language)}</dd></div>}
       </dl>
-      {task.status === 'pending' && <div className="mt-5 flex flex-wrap gap-2">
+      {getAccess()?.role!=='VETERINARIAN' && task.status === 'pending' && <div className="mt-5 flex flex-wrap gap-2">
         <button className="registry-action" disabled={busy} onClick={() => void finish('completed')}>{t.complete}</button>
         <Link className="registry-action secondary" to={'/tasks/' + id + '/edit'}>{t.edit} / {t.reschedule}</Link>
         {confirm ? <>

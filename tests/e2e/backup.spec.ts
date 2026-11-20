@@ -71,5 +71,5 @@ test('downloads and restores an offline backup with preview, photo, language and
   await expect.poll(() => page.getByRole('img', { name: 'Fotografia' })
     .evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(192)
   await expect(page.getByText('E arkivuar', { exact: true })).toBeVisible()
-  await expect(page.getByText('Pa internet · Vetëm në këtë pajisje')).toBeVisible()
+  await expect(page.locator('.sync-inline')).toContainText('Pa internet')
 })

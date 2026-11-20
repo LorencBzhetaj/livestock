@@ -1,3 +1,5 @@
+import {getAccess} from '../auth/access'
+import {Icon} from '../../components/Icon'
 import { useCallback, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { Language } from '../../db/models'
@@ -42,6 +44,7 @@ type ProfileData = NonNullable<Awaited<ReturnType<typeof readAnimal>>>
 
 function Profile({ language, data }: { language: Language; data: ProfileData }) {
   const { animal, species, photo, groups, dam, sire } = data
+  const readOnly=getAccess()?.role==='VETERINARIAN'
   const t = animalStrings[language]
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -51,7 +54,7 @@ function Profile({ language, data }: { language: Language; data: ProfileData }) 
   const date = (value?: string) => value ? dateFormat.format(new Date(value)) : undefined
   const fields = [
     [t.earTag, animal.earTag], [t.species, item && speciesName(item, language)],
-    [t.breed, animal.breed], [t.sex, t[animal.sex]], [t.status, t[animal.status]],
+    [t.breed, animal.breed], [t.sex, t[animal.sex]],
     [t.birthDate, date(animal.birthDate)],
     [t.acquisitionDate, date(animal.acquisitionDate)], [t.source, animal.source],
     [t.group, groups.find(({ id }) => id === animal.groupId)?.name],
@@ -76,11 +79,14 @@ function Profile({ language, data }: { language: Language; data: ProfileData }) 
     <>
       <div className="registry-heading mt-2">
         <h1 className="min-w-0 break-words">{animal.name || animal.earTag}</h1>
-        <Link to="edit" className="registry-action">{t.edit}</Link>
+        {!readOnly&&<Link to="edit" className="registry-action secondary">{t.edit}</Link>}
       </div>
-      <section className="panel mt-6">
+      <p className="profile-meta"><span>{animal.earTag}</span><span className="status-label">{t[animal.status]}</span></p>
+      <section className="panel profile-card">
+        {photo?<AnimalPhoto image={photo} className="profile-portrait" alt={t.photo}/>:<div className="profile-placeholder"><Icon name="animals" className="size-16"/></div>}
+        <div>
         <h2>{t.identification}</h2>
-        <div className="mt-4 grid gap-5 sm:grid-cols-[1fr_auto]">
+        <div className="mt-5">
           <dl className="grid grid-cols-2 gap-x-3 gap-y-4 sm:gap-x-6">
             {fields.map(([label, value]) => (
               <div className="min-w-0" key={label}>
@@ -92,9 +98,10 @@ function Profile({ language, data }: { language: Language; data: ProfileData }) 
               </div>
             ))}
           </dl>
-          {photo && <AnimalPhoto image={photo} className="max-h-56 max-w-full rounded-md object-contain sm:max-w-52" alt={t.photo} />}
+
         </div>
-        {animal.notes && <div className="mt-5 border-t border-stone-200 pt-4">
+        </div>
+        {animal.notes && <div className="col-span-full mt-5 border-t border-stone-200 pt-4">
           <h3 className="font-semibold">{t.notes}</h3>
           <p className="mt-1 whitespace-pre-wrap break-words">{animal.notes}</p>
         </div>}
@@ -108,7 +115,7 @@ function Profile({ language, data }: { language: Language; data: ProfileData }) 
           </section>
         ))}
       </div>
-      {animal.status !== 'archived' && <div className="mt-5 border-t border-stone-300 pt-4">
+      {!readOnly && animal.status !== 'archived' && <div className="mt-5 border-t border-stone-300 pt-4">
         {confirm ? (
           <>
             <p>{t.archiveHelp}</p>

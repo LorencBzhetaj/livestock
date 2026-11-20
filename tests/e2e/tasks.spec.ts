@@ -12,7 +12,7 @@ async function offline(page: Page) {
 test('creates, edits, reschedules, filters, completes and cancels tasks offline across local midnight', async ({ page }) => {
   await page.clock.setFixedTime(instant)
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Regjistri i fermës' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Si është ferma sot?' })).toBeVisible()
   await offline(page)
   await page.getByRole('link', { name: 'Shto detyrë' }).click()
   await expect(page.getByLabel('Data e afatit')).toHaveValue(today)
@@ -129,5 +129,5 @@ test('shows live counts for 200 animals and creates one confirmed reminder from 
   await expect(page.getByRole('button', { name: 'Create reminder' })).toHaveCount(0)
   await page.getByRole('navigation').getByRole('link', { name: 'Overview', exact: true }).click()
   await expect(page.getByRole('link', { name: 'Next 7 days 1' })).toBeVisible()
-  await expect(page.getByText('Offline · This device only')).toBeVisible()
+  await expect(page.locator('.sync-inline')).toContainText('Offline')
 })

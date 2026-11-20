@@ -71,7 +71,7 @@ test('registers, edits, searches, filters and archives an animal offline', async
   await expect(reopened.getByRole('heading', { name: 'Lule' })).toBeVisible()
   await expect(reopened.getByText('Archived', { exact: true })).toBeVisible()
   await expect.poll(() => reopened.getByRole('img', { name: 'Photograph' }).evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(192)
-  await expect(reopened.getByText('Offline · This device only')).toBeVisible()
+  await expect(reopened.locator('.sync-inline')).toContainText('Offline')
   expect(await reopened.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(reopened.viewportSize()!.width)
   await reopened.getByRole('link', { name: 'Back to registry' }).click()
   await reopened.getByRole('combobox', { name: 'Status', exact: true }).selectOption('active')

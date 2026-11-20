@@ -1,3 +1,4 @@
+import {getAccess} from '../auth/access'
 import { useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { animalSexes, animalStatuses, type Language } from '../../db/models'
@@ -49,10 +50,10 @@ export function AnimalList({ language }: { language: Language }) {
     <div className="registry">
       <div className="registry-heading">
         <h1>{t.registry}</h1>
-        <div className="flex flex-wrap gap-2">
+        {getAccess()?.role!=='VETERINARIAN'&&<div className="flex flex-wrap gap-2">
           <Link className="registry-action secondary" to="import">{t.csv}</Link>
           <Link className="registry-action" to="new">{t.add}</Link>
-        </div>
+        </div>}
       </div>
       {imported !== undefined && <p className="mt-4 text-pine" role="status">{t.imported} · {imported}</p>}
       {result?.error && <p className="registry-error mt-5" role="alert">{strings[language].error}</p>}

@@ -71,8 +71,8 @@ test('three browser profiles enroll and exchange records after an offline restar
       await page.getByLabel('Device name').fill(label)
       await page.getByLabel('Device enrollment code').fill(code)
       await page.getByRole('button', {name:'Enroll device'}).click()
-      await page.getByRole('button', {name:'Confirm reconciliation'}).click()
-      await expect(page.getByText('Fully synchronized', {exact:true})).toBeVisible({timeout:15_000})
+      await page.getByRole('button', {name:'Confirm and continue'}).click()
+      await expect(page.getByText('Synced', {exact:true})).toBeVisible({timeout:15_000})
     }
     const desktop = await profile(1280, 800)
     await link(desktop.page, 'Desktop', bootstrap)
@@ -89,17 +89,18 @@ test('three browser profiles enroll and exchange records after an offline restar
     await expect(desktop.page.getByText('The app is ready for offline use.')).toBeVisible()
     await desktop.context.setOffline(true)
     await desktop.page.getByRole('button', {name:'Add DEMO data'}).click()
+    await expect(desktop.page.getByText('DEMO data has been added on this device.',{exact:true})).toBeVisible()
     await expect(desktop.page.getByText('Offline',{exact:true}).last()).toBeVisible()
     await desktop.page.close()
     interrupt = true
     await desktop.context.setOffline(false)
     const reopened = await desktop.context.newPage()
     await reopened.goto('/settings')
-    await expect(reopened.getByText('Fully synchronized', {exact:true})).toBeVisible({timeout:20_000})
+    await expect(reopened.getByText('Synced', {exact:true})).toBeVisible({timeout:20_000})
     expect(dropped).toBe(true)
     for (const device of [iphone, android]) {
       await device.page.getByRole('button',{name:'Sync now'}).click()
-      await expect(device.page.getByText('Fully synchronized',{exact:true})).toBeVisible()
+      await expect(device.page.getByText('Synced',{exact:true})).toBeVisible()
       await device.page.getByRole('link',{name:'Animals',exact:true}).click()
       await expect(device.page.getByText('DEMO-001',{exact:true})).toBeVisible()
     }

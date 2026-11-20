@@ -7,7 +7,7 @@ test('installed shell and local records survive offline navigation and reopen', 
   })
 
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Regjistri i fermës' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Si është ferma sot?' })).toBeVisible()
   await expect(page.getByText('Nuk ka ende kafshë të regjistruara.')).toBeVisible()
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true)
   const manifest = await page.request.get('/manifest.webmanifest')
@@ -15,7 +15,7 @@ test('installed shell and local records survive offline navigation and reopen', 
 
   await context.setOffline(true)
   await page.reload()
-  await expect(page.getByText('Pa internet · Vetëm në këtë pajisje')).toBeVisible()
+  await expect(page.locator('.sync-inline')).toContainText('Pa internet')
   await page.getByRole('link', { name: 'Cilësimet' }).click()
   await page.getByRole('button', { name: 'Shto të dhënat DEMO' }).click()
   await expect(page.getByText('Të dhënat DEMO janë shtuar në këtë pajisje.')).toBeVisible()

@@ -1,14 +1,14 @@
 # Username and password accounts
 
-The M8 Preview uses exactly one ADMIN and one VETERINARIAN per farm. Usernames contain 3–40 ASCII letters, digits or underscores and are normalized to lowercase. Passwords contain 12–128 characters. The server hashes passwords with Node's scrypt using N=131072, r=8, p=1, a random 16-byte salt and a 64-byte key. Password hashes never appear in API responses. No default usernames or passwords are supplied.
+The M8 Preview uses exactly one ADMIN and one VETERINARIAN per farm. The fixed usernames are `adi` (ADMIN) and `vet` (VETERINARIAN). Passwords contain 12–128 characters. The server hashes passwords with Node's scrypt using N=131072, r=8, p=1, a random 16-byte salt and a 64-byte key. Password hashes never appear in API responses. No default passwords are supplied.
 
 ## Initial owner setup
 
 An operator verifies the isolated Neon branch and database and prepares a one-use owner setup grant for the existing farm using `scripts/auth-setup.mjs`. The grant expires after 24 hours. The script takes an absolute private `.setup-code` file path and reads `SYNC_OPERATOR_DATABASE_URL`, `AUTH_SETUP_FARM_ID` and `AUTH_SETUP_EXPECTED_HOST` privately. Use a directory restricted to the owner and keep the file outside Git. Opening the setup form alone cannot claim a farm. After setup, devices sign in with the chosen username and password.
 
-At the protected Preview, choose **Set up owner**, enter the private setup code and your chosen credentials, then name the device. A newly authenticated Admin can explicitly adopt the original local cache when it belongs to the same farm identity. Otherwise the account opens a separate cache. The initial synchronization review still requires confirmation. Existing records and pending operations are retained.
+At the protected Preview, choose **First visit? Set up adi**, enter the private setup code and choose a strong password. Device names are assigned automatically. A newly authenticated Admin can explicitly adopt the original local cache when it belongs to the same farm identity. Otherwise the account opens a separate cache. The initial synchronization review still requires confirmation. Existing records and pending operations are retained.
 
-The Admin opens **Veterinarian account**, enters a distinct username and password and reenters their own current password. Saving an existing Vet username resets that password, activates the account and revokes its sessions. At most one account of each role can exist per farm. The Vet signs in normally and explicitly reviews the remote records before caching them.
+The Admin opens **Settings → Veterinarian account**, sets the password for the fixed `vet` username and reenters their own current password. Saving an existing Vet username resets that password, activates the account and revokes its sessions. At most one account of each role can exist per farm. The Vet signs in normally and explicitly reviews the remote records before caching them.
 
 ## Sessions and permissions
 

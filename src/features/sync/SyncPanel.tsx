@@ -10,12 +10,12 @@ import { watchSync, type SyncStatus } from './coordinator'
 import { devicesSchema, type Mutation, type Session } from './protocol'
 
 const sq = {
-  title: 'Sinkronizimi', unlinked: 'Kjo pajisje punon lokalisht.', offline: 'Pa internet', pending: 'Ndryshime në pritje',
-  working: 'Duke sinkronizuar…', synced: 'Të dhënat janë të sinkronizuara', conflict: 'Konflikt për shqyrtim',
+  title: 'Të dhënat e fermës', unlinked: 'Shqyrto të dhënat për të filluar.', offline: 'Pa internet', pending: 'Ndryshime në pritje',
+  working: 'Duke përditësuar…', synced: 'Të përditësuara', conflict: 'Konflikt për shqyrtim',
   failed: 'Sinkronizimi dështoi. Të dhënat lokale ruhen.', code: 'Kodi i regjistrimit të pajisjes',
-  device: 'Emri i pajisjes', enroll: 'Regjistro pajisjen', review: 'Shqyrto të dhënat', confirm: 'Konfirmo bashkimin',
+  device: 'Emri i pajisjes', enroll: 'Regjistro pajisjen', review: 'Shqyrto të dhënat', confirm: 'Konfirmo dhe vazhdo',
   sync: 'Sinkronizo tani', invite: 'Krijo kod për një pajisje tjetër', hide: 'Fshih kodin', devices: 'Pajisjet',
-  revoke: 'Hiq qasjen', revoked: 'Qasja u hoq', localCount: 'Regjistrime lokale', remoteCount: 'Regjistrime nga serveri',
+  revoke: 'Hiq qasjen', revoked: 'Qasja u hoq', localCount: 'Regjistrime lokale', remoteCount: 'Të dhënat e fermës',
   reviewHelp: 'Kontrollo të dyja listat para bashkimit. Konfliktet ruhen për shqyrtim.',
   keepLocal: 'Dërgo versionin lokal', keepServer: 'Përdor versionin e serverit', current: 'Versioni i serverit',
   draft: 'Versioni lokal', reason: 'Shkaku', detach: 'Kalo në përdorim lokal',
@@ -28,12 +28,12 @@ const sq = {
   invalidReview: 'Të dhënat kanë etiketa, lloje ose lidhje të papajtueshme. Rregulloji para bashkimit.',
 }
 const en: typeof sq = {
-  title: 'Synchronization', unlinked: 'This device works locally.', offline: 'Offline', pending: 'Local changes pending',
-  working: 'Synchronizing…', synced: 'Fully synchronized', conflict: 'Conflict needs review',
+  title: 'Farm data', unlinked: 'Review your records to get started.', offline: 'Offline', pending: 'Local changes pending',
+  working: 'Syncing', synced: 'Synced', conflict: 'Needs attention',
   failed: 'Synchronization failed. Local records are kept.', code: 'Device enrollment code',
-  device: 'Device name', enroll: 'Enroll device', review: 'Review records', confirm: 'Confirm reconciliation',
+  device: 'Device name', enroll: 'Enroll device', review: 'Review records', confirm: 'Confirm and continue',
   sync: 'Sync now', invite: 'Create a code for another device', hide: 'Hide code', devices: 'Devices',
-  revoke: 'Revoke access', revoked: 'Revoked', localCount: 'Local records', remoteCount: 'Server records',
+  revoke: 'Revoke access', revoked: 'Revoked', localCount: 'Local records', remoteCount: 'Farm records',
   reviewHelp: 'Review both lists before merging. Conflicts are kept for review.',
   keepLocal: 'Send local version', keepServer: 'Use server version', current: 'Server version',
   draft: 'Local version', reason: 'Reason', detach: 'Switch to local mode',
@@ -46,6 +46,18 @@ const en: typeof sq = {
   invalidReview: 'The records have incompatible tags, species, or references. Resolve them before merging.',
 }
 const words = { sq, en }
+const recordNames = {
+ sq: {species:'Lloji',groups:'Grupi',animals:'Kafsha',healthEvents:'Kujdesi veterinar',vaccinations:'Vaksinimi',treatments:'Trajtimi',veterinaryOperations:'Vaksinimi në grup',tasks:'Detyra'},
+ en: {species:'Species',groups:'Group',animals:'Animal',healthEvents:'Veterinary care',vaccinations:'Vaccination',treatments:'Treatment',veterinaryOperations:'Batch vaccination',tasks:'Task'},
+}
+function RecordReview({rows,language}:{rows:unknown[];language:Language}){
+ const labels:Record<string,string>=language==='sq'?{earTag:'Etiketa',name:'Emri',status:'Gjendja',notes:'Shënime',title:'Titulli',dueDate:'Afati',productName:'Vaksina',medicineName:'Bari',diagnosis:'Diagnoza'}:
+  {earTag:'Ear tag',name:'Name',status:'Status',notes:'Notes',title:'Title',dueDate:'Due date',productName:'Vaccine',medicineName:'Medicine',diagnosis:'Diagnosis'}
+ return <div className="max-h-64 overflow-auto">{rows.map((row,index)=><dl key={index} className="grid grid-cols-2 gap-2 border-b border-stone-200 py-3 text-sm">
+  {row&&typeof row==='object'?Object.entries(row).filter(([key,value])=>!key.endsWith('Id')&&!['id','createdAt','updatedAt','results','fingerprint'].includes(key)&&value!==null&&typeof value!=='object').map(([key,value])=>
+   <div key={key} className="min-w-0"><dt className="text-stone-600">{labels[key]??key.replace(/([A-Z])/g,' $1')}</dt><dd className="break-words">{String(value)}</dd></div>):<p>{language==='sq'?'Regjistrimi u hoq':'Record removed'}</p>}
+ </dl>)}</div>
+}
 
 type Review = { session: Session; local: Mutation[]; remote: Awaited<ReturnType<typeof snapshotRemote>>; valid: boolean; remapped: number }
 const shortName = (payload: unknown) => {
@@ -103,7 +115,10 @@ export default function SyncPanel({ language, settings }: { language: Language; 
     setReview({ session, local, remote, valid, remapped })
   }
   const wake = () => window.dispatchEvent(new Event('livestock-sync'))
-  if (!settings) return state ? <p className="mb-3 text-sm" role="status">{t[status]}</p> : null
+  if (!settings && (state || !accountMode)) return <div className="sync-inline mb-5" role="status">
+    <span className={'connection-dot '+(status==='offline'||status==='conflict'?'is-offline':'')}/>
+    {state?t[status]:navigator.onLine?(language==='sq'?'Gati për punë':'Ready to work'):t.offline}
+  </div>
 
   return <section className="panel mt-4" aria-labelledby="sync-heading">
     <h2 id="sync-heading">{t.title}</h2>
@@ -127,11 +142,11 @@ export default function SyncPanel({ language, settings }: { language: Language; 
       <p>{t.reviewHelp}</p>
       <details><summary>{t.localCount} ({review.local.length})</summary>
         <ul className="max-h-48 overflow-auto">{review.local.map((row) =>
-          <li key={row.entity + row.recordId}>{row.entity}{shortName(row.payload)}</li>)}</ul>
+          <li key={row.entity + row.recordId}>{recordNames[language][row.entity]}{shortName(row.payload)}</li>)}</ul>
       </details>
       <details><summary>{t.remoteCount} ({review.remote.records.length})</summary>
         <ul className="max-h-48 overflow-auto">{review.remote.records.map((row) =>
-          <li key={row.entity + row.recordId}>{row.entity}{shortName(row.payload)}</li>)}</ul>
+          <li key={row.entity + row.recordId}>{recordNames[language][row.entity]}{shortName(row.payload)}</li>)}</ul>
       </details>
       {review.remapped > 0 && <p>{t.remap} ({review.remapped})</p>}
       {!review.valid && <p role="alert">{t.invalidReview}</p>}
@@ -143,7 +158,7 @@ export default function SyncPanel({ language, settings }: { language: Language; 
     </div>}
     {state && <>
       <p>{state.name}</p>
-      <button disabled={pending} onClick={wake}>{t.sync}</button>
+      <button className="registry-action secondary mt-3" disabled={pending} onClick={wake}>{t.sync}</button>
       {!accountMode && <button disabled={pending} onClick={() => void perform(async () => setInviteCode((await invite()).code))}>{t.invite}</button>}
       {inviteCode && <div><output className="break-all">{inviteCode}</output><button onClick={() => setInviteCode('')}>{t.hide}</button></div>}
       {!readOnly && <button disabled={pending} onClick={() => void perform(async () => {
@@ -163,8 +178,8 @@ export default function SyncPanel({ language, settings }: { language: Language; 
     {!readOnly && entry?.status === 'conflict' && entry.conflict && <article className="mt-4 border-t pt-3">
       <h3>{t.conflict}</h3>
       <p>{t[entry.conflict.reason]}</p>
-      <details><summary>{t.draft}</summary><pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify(entry.operation.mutations.map((m) => m.payload), null, 2)}</pre></details>
-      <details><summary>{t.current}</summary><pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify(entry.conflict.current.map((m) => m.payload), null, 2)}</pre></details>
+      <details><summary>{t.draft}</summary><RecordReview rows={entry.operation.mutations.map(m=>m.payload)} language={language}/></details>
+      <details><summary>{t.current}</summary><RecordReview rows={entry.conflict.current.map(m=>m.payload)} language={language}/></details>
       <button disabled={pending} onClick={() => void perform(() => resolve(database, entry.sequence!, 'server'))}>{t.keepServer}</button>
       <button disabled={pending} onClick={() => void perform(() => resolve(database, entry.sequence!, 'local'))}>{t.keepLocal}</button>
     </article>}

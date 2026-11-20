@@ -1,3 +1,4 @@
+import {getAccess} from '../auth/access'
 import { useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { Language } from '../../db/models'
@@ -36,7 +37,7 @@ export function HealthDetails({ language, editing = false }: { language: Languag
       <Link to="/veterinary" className="registry-link inline-flex min-h-11 items-center">{t.back}</Link>
       <div className="registry-heading mt-2">
         <h1>{t[event.kind]}{event.amendsId ? ' · ' + t.amendment : ''}</h1>
-        {animal && !amendment && <Link to={'/veterinary/events/' + id + '/amend'} className="registry-action secondary">{t.amend}</Link>}
+        {getAccess()?.role!=='VETERINARIAN' && animal && !amendment && <Link to={'/veterinary/events/' + id + '/amend'} className="registry-action secondary">{t.amend}</Link>}
       </div>
       {animal && <Link className="registry-link mt-2 inline-block break-words" to={'/animals/' + animal.id}>{animalLabel(animal)}</Link>}
       <section className="panel mt-6 max-w-3xl">
@@ -55,7 +56,7 @@ export function HealthDetails({ language, editing = false }: { language: Languag
           {event.batchId && <div><dt>{t.batchId}</dt><dd className="break-all">{event.batchId}</dd></div>}
         </dl>
       </section>
-      <EventReminder key={id} eventId={id} language={language} />
+      {getAccess()?.role!=='VETERINARIAN'&&<EventReminder key={id} eventId={id} language={language} />}
     </div>
   )
 }

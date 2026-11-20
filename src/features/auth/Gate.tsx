@@ -1,6 +1,7 @@
 import {lazy,Suspense,useEffect,useState} from 'react'
 import {authSession,type AuthSession} from './protocol'
 import {setAccess} from './access'
+import {useLocation} from 'react-router-dom'
 const App=lazy(()=>import('../../app/App').then(m=>({default:m.App})))
 const cacheKey='livestock-auth-profile'
 type Profile={session:AuthSession;database:string}
@@ -10,7 +11,7 @@ const sq={
  error:'Hyrja dështoi. Kontrollo të dhënat ose prit para se të provosh përsëri.',
  logout:'Dil',vet:'Llogaria e veterinerit',current:'Fjalëkalimi yt aktual',save:'Ruaj llogarinë e veterinerit',
  done:'Llogaria u ruajt.',claim:'Konfirmoj lidhjen e të dhënave lokale ekzistuese me këtë llogari Admin.',
- readOnly:'VETERINARIAN — vetëm lexim',local:'Përdor të dhënat lokale ekzistuese',minimum:'Të paktën 12 karaktere.',
+ readOnly:'Vetëm lexim',local:'Përdor të dhënat lokale ekzistuese',minimum:'Të paktën 12 karaktere.',
 }
 const en:typeof sq={
  title:'Sign in to LivestockOS',username:'Username',password:'Password',remember:'Remember this device',
@@ -18,7 +19,7 @@ const en:typeof sq={
  error:'Sign-in failed. Check the details or wait before trying again.',
  logout:'Sign out',vet:'Veterinarian account',current:'Your current password',save:'Save veterinarian account',
  done:'Account saved.',claim:'I confirm linking existing local records to this Admin account.',
- readOnly:'VETERINARIAN — read only',local:'Use existing local records',minimum:'At least 12 characters.',
+ readOnly:'Read only',local:'Use existing local records',minimum:'At least 12 characters.',
 }
 async function call(input:object) {
  const res=await fetch('/api/auth',{method:'POST',credentials:'same-origin',cache:'no-store',
@@ -39,17 +40,29 @@ function stored():Profile|undefined {
  }catch{return}
 }
 
+function PasswordField({label,name,minimum,autoComplete,language}:{label:string;name:string;minimum?:number;autoComplete:string;language:'sq'|'en'}){
+ const [visible,setVisible]=useState(false)
+ const show=language==='sq'?'Shfaq':'Show',hide=language==='sq'?'Fshih':'Hide'
+ return <label>{label}<span className="password-control block">
+  <input aria-label={label} name={name} type={visible?'text':'password'} required minLength={minimum} maxLength={128} autoComplete={autoComplete}/>
+  <button type="button" className="password-toggle" aria-pressed={visible} aria-label={(visible?hide:show)+' '+label.toLowerCase()} onClick={()=>setVisible(!visible)}>{visible?hide:show}</button>
+ </span></label>
+}
+
 export default function Gate(){
+ const route=useLocation()
  const [profile,setProfile]=useState<Profile>()
  const [ready,setReady]=useState(false)
  const [language,setLanguage]=useState<'sq'|'en'>('sq')
  const [setup,setSetup]=useState(false)
+ const [setupAvailable,setSetupAvailable]=useState(false)
  const [error,setError]=useState(false)
  const [busy,setBusy]=useState(false)
  const [adopt,setAdopt]=useState(false)
  const [pending,setPending]=useState<AuthSession>()
  const [accountForm,setAccountForm]=useState(false)
  const [saved,setSaved]=useState(false)
+ const [errorStatus,setErrorStatus]=useState<number>()
  const t=language==='sq'?sq:en
  async function accept(session:AuthSession,database:string) {
   setAccess(session,database)
@@ -67,6 +80,7 @@ export default function Gate(){
   const value={session,database}
   if(database==='livestockos')localStorage.setItem('livestock-legacy-owner',session.accountId)
   localStorage.removeItem('livestock-auth-signed-out')
+  localStorage.setItem('livestock-cache-'+session.accountId,database)
   localStorage.setItem(cacheKey,JSON.stringify(value))
   setProfile(value)
   location.reload()
@@ -76,6 +90,9 @@ export default function Gate(){
   const old=stored()
   async function initialize(){
    setAccess()
+   if(navigator.onLine){
+    try{const status=await call({action:'status'});if(alive)setSetupAvailable(status.setupAvailable===true)}catch{ /* Setup stays hidden when unavailable. */ }
+   }
    if(localStorage.getItem('livestock-auth-signed-out')) {
     if(alive)setReady(true)
     return
@@ -87,7 +104,13 @@ export default function Gate(){
      const session=authSession.parse(await call({action:'session'}))
      if(alive){
       if(old&&old.session.accountId===session.accountId){setAccess(session,old.database);setProfile({session,database:old.database});localStorage.setItem(cacheKey,JSON.stringify({session,database:old.database}))}
-      else setPending(session)
+      else {
+       const binding=localStorage.getItem('livestock-legacy-owner')
+       const database=session.role==='ADMIN'&&binding===session.accountId?'livestockos':'livestockos-account-'+session.accountId
+       setAccess(session,database)
+       setProfile({session,database})
+       localStorage.setItem(cacheKey,JSON.stringify({session,database}))
+      }
      }
     }catch{ /* Require login after server-side revocation or expiration. */ }
    }
@@ -125,6 +148,25 @@ export default function Gate(){
   }
  },[profile])
 
+ async function continueSession(session:AuthSession){
+  const prior=stored()
+  const known=localStorage.getItem('livestock-cache-'+session.accountId)
+  if(known==='livestockos-account-'+session.accountId || known==='livestockos' && session.role==='ADMIN')return accept(session,known)
+  const binding=localStorage.getItem('livestock-legacy-owner')
+  if(prior?.session.accountId===session.accountId)return accept(session,prior.database)
+  if(session.role==='ADMIN'&&binding===session.accountId)return accept(session,'livestockos')
+  if(session.role==='ADMIN'&&!binding){
+   setAccess(session,'livestockos')
+   const {LivestockDatabase}=await import('../../db/database')
+   const legacy=new LivestockDatabase('livestockos')
+   try {
+    const count=await legacy.animals.count()
+    if(count){setPending(session);return}
+   }finally{legacy.close()}
+  }
+  return accept(session,'livestockos-account-'+session.accountId)
+ }
+
  async function submit(event:React.FormEvent<HTMLFormElement>){
   event.preventDefault();setBusy(true);setError(false)
   const form=event.currentTarget
@@ -133,53 +175,54 @@ export default function Gate(){
    if(localStorage.getItem('livestock-auth-signed-out')) await call({action:'logout'})
    const value=authSession.parse(await call({
     action:setup?'setup':'login',username:data.get('username'),password:data.get('password'),
-    remember:data.get('remember')==='on',label:data.get('label'),
+    remember:data.get('remember')==='on',label:navigator.userAgent.includes('iPhone')?'iPhone':navigator.userAgent.includes('Android')?'Android':'Computer',
     ...(setup?{code:data.get('code')}:{}),
    }))
    form.reset()
-   const prior=stored()
-   const binding=localStorage.getItem('livestock-legacy-owner')
-   if(prior?.session.accountId===value.accountId)await accept(value,prior.database)
-   else if(value.role==='ADMIN' && binding===value.accountId)await accept(value,'livestockos')
-   else setPending(value)
-  }catch{setError(true)}finally{setBusy(false)}
+   await continueSession(value)
+  }catch(error){setError(true);setErrorStatus((error as {status?:number}).status)}finally{setBusy(false)}
  }
- if(!ready)return <p role="status">…</p>
- if(!profile)return <main className="mx-auto max-w-lg p-6">
-  <select aria-label="Language" value={language} onChange={e=>setLanguage(e.target.value as 'sq'|'en')}><option value="sq">Shqip</option><option value="en">English</option></select>
-  <h1>{t.title}</h1>
-  {error&&<p role="alert">{t.error}</p>}
-  {pending?<div>
-   <p>{pending.username} · {pending.role}</p>
-   {pending.role==='ADMIN'&&!localStorage.getItem('livestock-legacy-owner')&&<label><input type="checkbox" checked={adopt} onChange={e=>setAdopt(e.target.checked)}/>{t.claim}</label>}
-   <button disabled={busy} onClick={async()=>{
-    setBusy(true);setError(false)
-    const name=pending.role==='ADMIN'&&adopt?'livestockos':'livestockos-account-'+pending.accountId
-    try {
-     await accept(pending,name)
-     if(name==='livestockos')localStorage.setItem('livestock-legacy-owner',pending.accountId)
-     setPending(undefined)
-    } catch {setError(true);setAccess()}
-    finally {setBusy(false)}
-   }}>{t.login}</button>
-  </div>:<form onSubmit={submit} className="grid gap-3">
-   <label>{t.username}<input name="username" required pattern="[A-Za-z0-9_]{3,40}" autoComplete="username"/></label>
-   <label>{t.password}<input name="password" type="password" required maxLength={128} minLength={setup?12:1} autoComplete={setup?'new-password':'current-password'}/></label>
-   {setup&&<><p>{t.minimum}</p><label>{t.code}<input name="code" type="password" required autoComplete="off"/></label></>}
-   <label>{t.label}<input name="label" required maxLength={80}/></label>
-   <label><input type="checkbox" name="remember"/>{t.remember}</label>
-   <button disabled={busy}>{setup?t.setup:t.login}</button>
-   <button type="button" disabled={busy} onClick={()=>setSetup(!setup)}>{setup?t.login:t.setup}</button>
-  </form>}
- </main>
+ if(!ready)return <div className="min-h-screen flex items-center justify-center" role="status">LivestockOS…</div>
+ if(!profile)return <div className="auth-page">
+  <aside className="auth-aside">
+   <a className="brand" href="/"><img src="/icon-192.png" width="40" height="40" alt=""/><span>Livestock<span className="brand-light">OS</span></span></a>
+   <div className="auth-message"><h2>{language==='sq'?'Ferma jote, në duar të sigurta.':'Your farm, in good hands.'}</h2>
+    <p>{language==='sq'?'Kafshët, kujdesi dhe punët e ditës. Të gjitha në një vend.':'Your animals, their care, and the work ahead. Together in one place.'}</p></div>
+   <small>{language==='sq'?'Pranë fermës, edhe pa internet.':'By your side, even offline.'}</small>
+  </aside>
+  <main className="auth-main">
+   <select className="auth-language" aria-label="Language" value={language} onChange={e=>setLanguage(e.target.value as 'sq'|'en')}><option value="sq">Shqip</option><option value="en">English</option></select>
+   <div className="auth-form">
+    <h1>{setup?(language==='sq'?'Mirë se erdhe, adi':'Welcome, adi'):t.title}</h1>
+    <p>{setup?(language==='sq'?'Zgjidh një fjalëkalim të fortë për llogarinë tënde.':'Choose a strong password for your account.'):(language==='sq'?'Hyr për të parë fermën tënde.':'Sign in to your farm.')}</p>
+    {error&&<p role="alert" className="registry-error">{errorStatus===429?(language==='sq'?'Shumë përpjekje. Prit 15 minuta dhe provo përsëri.':'Too many attempts. Wait 15 minutes and try again.'):errorStatus===401?(language==='sq'?'Emri ose fjalëkalimi nuk përputhet. Provo përsëri.':'The username or password does not match. Please try again.'):t.error}</p>}
+    {pending?<div>
+     <p>{language==='sq'?'U gjetën të dhëna të ruajtura në këtë pajisje.':'Existing records were found on this device.'}</p>
+     {pending.role==='ADMIN'&&!localStorage.getItem('livestock-legacy-owner')&&<label className="block my-4"><input type="checkbox" checked={adopt} onChange={e=>setAdopt(e.target.checked)}/>{t.claim}</label>}
+     <button className="registry-action" disabled={busy} onClick={async()=>{
+      setBusy(true);setError(false)
+      try{await accept(pending,pending.role==='ADMIN'&&adopt?'livestockos':'livestockos-account-'+pending.accountId)}
+      catch{setError(true);setAccess()}finally{setBusy(false)}
+     }}>{language==='sq'?'Vazhdo':'Continue'}</button>
+    </div>:<form onSubmit={submit}>
+     <label>{t.username}<input name="username" required autoComplete="username" autoCapitalize="none" spellCheck={false} pattern="adi|vet" defaultValue={setup?'adi':undefined} readOnly={setup}/></label>
+     <PasswordField label={t.password} name="password" minimum={setup?12:1} autoComplete={setup?'new-password':'current-password'} language={language}/>
+     {setup&&<><p className="text-sm">{t.minimum}</p><label>{language==='sq'?'Kodi privat për hapjen e llogarisë':'Private account setup code'}<input name="code" type="password" required autoComplete="off"/></label></>}
+     <label className="auth-remember"><input type="checkbox" name="remember"/>{t.remember}</label>
+     <button className="registry-action" disabled={busy}>{setup?(language==='sq'?'Krijo llogarinë adi':'Create adi account'):t.login}</button>
+    </form>}
+    {!pending&&(setupAvailable||setup)&&<button className="text-button" type="button" disabled={busy} onClick={()=>{setSetup(!setup);setError(false)}}>{setup?(language==='sq'?'Kthehu te hyrja':'Back to sign in'):(language==='sq'?'Përdorimi i parë? Hap llogarinë adi':'First visit? Set up adi')}</button>}
+   </div>
+  </main>
+ </div>
  return <>
-  <div className="mx-auto flex max-w-5xl flex-wrap gap-3 px-5 pt-3">
+  <section className="account-toolbar" aria-label={language==='sq'?'Llogaria':'Account'}>
    <select aria-label="Account language" value={language} onChange={async e=>{
     const value=e.target.value as 'sq'|'en';setLanguage(value)
     const {repositories}=await import('../../db/repositories')
     await repositories.settings.save({key:'language',value,updatedAt:new Date().toISOString()})
    }}><option value="sq">Shqip</option><option value="en">English</option></select>
-   <span>{profile.session.username} · {profile.session.role==='VETERINARIAN'?t.readOnly:'ADMIN'}</span>
+   <span>{profile.session.username}{profile.session.role==='VETERINARIAN'?' · '+t.readOnly:''}</span>
    <button disabled={busy} onClick={async()=>{
     setBusy(true)
     try{
@@ -188,15 +231,15 @@ export default function Gate(){
      localStorage.removeItem(cacheKey);setAccess();setProfile(undefined);location.reload()
     }catch{setError(true)}finally{setBusy(false)}
    }}>{t.logout}</button>
-   {profile.session.role==='ADMIN'&&<button onClick={()=>setAccountForm(!accountForm)}>{t.vet}</button>}
-  </div>
+   {profile.session.role==='ADMIN'&&route.pathname==='/settings'&&<button onClick={()=>setAccountForm(!accountForm)}>{t.vet}</button>}
+  </section>
   {error&&<p role="alert">{t.error}</p>}
-  {accountForm&&<form className="panel mx-auto max-w-lg" onSubmit={async e=>{
+  {accountForm&&route.pathname==="/settings"&&<form aria-label={t.vet} className="panel account-panel" onSubmit={async e=>{
    e.preventDefault();const form=e.currentTarget,data=new FormData(form);setBusy(true);setError(false);setSaved(false)
    try{await call({action:'vet',username:data.get('username'),password:data.get('password'),currentPassword:data.get('currentPassword')});form.reset();setSaved(true)}catch{setError(true)}finally{setBusy(false)}
   }}>
    <h2>{t.vet}</h2>
-   <label>{t.username}<input name="username" required pattern="[A-Za-z0-9_]{3,40}" autoComplete="off"/></label>
+   <label>{t.username}<input name="username" required value="vet" readOnly autoComplete="off"/></label>
    <label>{t.password}<input name="password" type="password" minLength={12} maxLength={128} required autoComplete="new-password"/></label>
    <p>{t.minimum}</p>
    <label>{t.current}<input name="currentPassword" type="password" required autoComplete="current-password"/></label>

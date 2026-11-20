@@ -193,12 +193,18 @@ export default function NotificationSettings({ language, online }: { language: L
     <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
       {([
         [t.browser, ability.supported ? t.yes : t.no], [t.standalone, standalone ? t.installed : t.browserTab],
-        [t.notificationApi, ability.notification ? t.yes : t.no], [t.pushApi, ability.push ? t.yes : t.no],
+
         [t.permission, permission ? t[permission] : t.no],
         [t.enrollment, config?.enrollmentEnabled ? (config.enrolled ? t.enrolled : t.notEnrolled) : t.no],
         [t.subscription, subscription ? t.active : subscription === null ? t.none : ability.supported ? t.checking : t.no],
       ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd className="font-semibold">{value}</dd></div>)}
     </dl>
+    <details className="mt-3 text-sm"><summary>{language==='sq'?'Detajet e pajisjes':'Device details'}</summary>
+      <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+        <div><dt>{t.notificationApi}</dt><dd>{ability.notification?t.yes:t.no}</dd></div>
+        <div><dt>{t.pushApi}</dt><dd>{ability.push?t.yes:t.no}</dd></div>
+      </dl>
+    </details>
     {!ability.supported && <p className="mt-3">{t.unavailable}</p>}
     {permission === 'denied' && <p className="mt-3">{t.deniedHelp}</p>}
     {!online && <p className="mt-3">{t.offline}</p>}

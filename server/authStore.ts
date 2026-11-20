@@ -37,6 +37,13 @@ export function createAuthStore(transaction:Transaction) {
  return {
   session:(secret:string)=>transaction(sql=>session(sql,secret)),
   async execute(input:z.infer<typeof authRequest>,secret:string|undefined,ip:string) {
+   if(input.action==='status'){
+    const result=await transaction(sql=>sql.query<{available:boolean}>(`SELECT EXISTS(
+     SELECT 1 FROM livestock_sync.owner_setup s WHERE s.used_at IS NULL AND s.expires_at>now()
+     AND NOT EXISTS(SELECT 1 FROM livestock_sync.accounts a WHERE a.farm_id=s.farm_id AND a.role='ADMIN')
+    ) AS available`))
+    return {status:200,value:{setupAvailable:result.rows[0].available}}
+   }
    if(input.action==='session') {
     const value=secret && await transaction(sql=>session(sql,secret))
     return value ? {status:200,value} : {status:401,value:{error:'authorization'}}
@@ -46,10 +53,12 @@ export function createAuthStore(transaction:Transaction) {
     return {status:200,value:{loggedOut:true},cookie:cookie('',false)}
    }
    if(!await limit('global',60) || !await limit('ip:'+hash(ip),20)) return {status:429,value:{error:'limited'}}
+   if(input.action==='setup' && input.username!=='adi') return {status:400,value:{error:'username'}}
    if(input.action==='vet') {
     const actor=secret && await transaction(sql=>session(sql,secret))
     if(!actor) return {status:401,value:{error:'authorization'}}
     if(actor.role!=='ADMIN') return {status:403,value:{error:'forbidden'}}
+    if(input.username!=='vet') return {status:400,value:{error:'username'}}
     if(!await limit('reauth:'+actor.accountId,5)) return {status:429,value:{error:'limited'}}
     const own=(await transaction(sql=>sql.query<Account>('SELECT * FROM livestock_sync.accounts WHERE id=$1',[actor.accountId]))).rows[0]
     if(!own || !await checkPassword(input.currentPassword,own.password_hash)) return {status:401,value:{error:'authorization'}}

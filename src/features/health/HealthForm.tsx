@@ -33,7 +33,9 @@ export function HealthForm({ language, animals, animal, original }: {
   const t = healthStrings[language]
   const labels = animalStrings[language]
   const navigate = useNavigate()
-  const [kind, setKind] = useState<HealthEvent['kind']>(original?.event.kind ?? 'checkup')
+  const [params] = useSearchParams()
+  const requestedKind = params.get('kind') === 'vaccination' ? 'vaccination' : 'checkup'
+  const [kind, setKind] = useState<HealthEvent['kind']>(original?.event.kind ?? requestedKind)
   const [busy, setBusy] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const locked = useRef(false)

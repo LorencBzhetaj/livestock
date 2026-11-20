@@ -1,3 +1,4 @@
+import {getAccess} from '../auth/access'
 import { useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import type { Animal, HealthEvent, Language } from '../../db/models'
@@ -22,7 +23,7 @@ function EventList({ events, animals, language }: { events: HealthEvent[]; anima
   const amended = new Set(events.map(({ amendsId }) => amendsId))
   const labels = new Map(animals?.map((animal) => [animal.id, animalLabel(animal)]))
   return (
-    <ol className="mt-3 divide-y divide-stone-200">
+    <ol className="medical-timeline mt-3 divide-y divide-stone-200">
       {sortEvents(events).map((event) => (
         <li key={event.id}>
           <Link to={'/veterinary/events/' + event.id}
@@ -49,7 +50,7 @@ export function HealthTimeline({ animalId, language }: { animalId: string; langu
     <section className="panel mt-6" aria-labelledby="health-timeline">
       <div className="registry-heading">
         <h2 id="health-timeline">{t.timeline}</h2>
-        <Link to={'/veterinary/new?animal=' + animalId} className="registry-action">{t.add}</Link>
+        {getAccess()?.role!=='VETERINARIAN'&&<Link to={'/veterinary/new?animal=' + animalId} className="registry-action">{t.add}</Link>}
       </div>
       {result?.error && <p role="alert" className="registry-error mt-3">{strings[language].error}</p>}
       {!result && <p role="status" className="mt-3">{strings[language].loading}</p>}
@@ -70,10 +71,10 @@ export function HealthOverview({ language }: { language: Language }) {
     <div className="registry">
       <div className="registry-heading">
         <h1>{t.veterinary}</h1>
-        <div className="flex flex-wrap gap-2">
+        {getAccess()?.role!=='VETERINARIAN'&&<div className="flex flex-wrap gap-2">
           <Link to="batch" className="registry-action secondary">{t.batch}</Link>
           <Link to="new" className="registry-action">{t.add}</Link>
-        </div>
+        </div>}
       </div>
       <section className="panel mt-6">
         <h2>{t.recent}</h2>

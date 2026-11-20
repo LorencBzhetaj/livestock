@@ -31,7 +31,7 @@ export default defineConfig({
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
         ],
       },
-      injectManifest: { globPatterns: ['**/*.{js,css,html,png}'] },
+      injectManifest: { globPatterns: ['**/*.{js,css,html,png,woff2,ttf}'] },
     }),
   ],
   test: { include: ['tests/**/*.test.{ts,tsx}'] },

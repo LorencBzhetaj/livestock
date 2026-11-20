@@ -1,3 +1,4 @@
+import {getAccess} from '../auth/access'
 import { useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import type { Language } from '../../db/models'
@@ -23,74 +24,70 @@ export default function Dashboard({ language }: { language: Language }) {
   const tomorrow = shiftDay(today, 1)
   const calendar = (from: string, to: string) => '/tasks?status=pending&from=' + from + '&to=' + to
 
+  const readOnly=getAccess()?.role==='VETERINARIAN'
+  const due=data ? data.clinicalTasks.filter(row=>row.type==='vaccination').length+
+    data.clinicalDates.filter(row=>row.type==='vaccination').length : 0
+  const words=language==='sq'
+    ? {title:'Si është ferma sot?',intro:'Kafshët dhe kujdesi që kërkojnë vëmendjen tënde.',add:'Shto kafshë',vaccine:'Regjistro vaksinim',check:'Shto kontroll',soon:'Vaksinime në 30 ditët e ardhshme',urgent:'Kërkojnë vëmendje',all:'Shih kalendarin',herd:'Tufa jote'}
+    : {title:'How is the farm today?',intro:'Your animals and the care that needs your attention.',add:'Add animal',vaccine:'Record vaccination',check:'Add checkup',soon:'Vaccinations in the next 30 days',urgent:'Needs attention',all:'View calendar',herd:'Your herd'}
   return (
-    <div className="registry">
-      <div className="registry-heading">
-        <h1>{app.intro}</h1>
-        <Link to="/tasks" className="registry-action secondary">{t.calendar}</Link>
+    <div className="registry dashboard">
+      <div className="dashboard-heading">
+        <h1>{words.title}</h1>
+        <p className="page-description">{words.intro}</p>
+        {!readOnly&&<div className="dashboard-actions">
+          <Link to="/animals/new" className="registry-action">{words.add}</Link>
+          <Link to="/veterinary/new?kind=vaccination" className="registry-action secondary">{words.vaccine}</Link>
+          <Link to="/veterinary/new?kind=checkup" className="registry-action secondary">{words.check}</Link>
+        </div>}
       </div>
-      {!result && <p role="status" className="mt-5">{app.loading}</p>}
-      {result?.error && <p role="alert" className="registry-error mt-5">{app.error}</p>}
-      {data && <>
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          {([[t.total, data.total], [app.active, data.active], [t.archivedAnimals, data.archived]] as const).map(([label, count], index) => (
-            <section className="panel" key={label} aria-labelledby={'animal-count-' + index}>
-              <h2 id={'animal-count-' + index}>{label}</h2>
-              <p className="mt-2 text-4xl font-semibold tabular-nums text-pine">{count}</p>
-            </section>
-          ))}
+      {!result&&<p role="status">{app.loading}</p>}
+      {result?.error&&<p role="alert" className="registry-error">{app.error}</p>}
+      {data&&<>
+        <div className="stat-strip">
+          <section className="stat-cell" aria-label={app.active}><dl><dt>{app.active}</dt><dd>{data.active}</dd></dl></section>
+          <Link className="stat-cell" to="/tasks?type=vaccination"><dl><dt>{words.soon}</dt><dd>{due}</dd></dl></Link>
+          <Link className="stat-cell urgent" to={calendar('',shiftDay(today,-1))}><dl><dt>{t.overdue}</dt><dd>{data.taskCounts.overdue}</dd></dl></Link>
         </div>
-        {!data.total && <p className="mt-3">{app.empty}</p>}
-        <section className="panel mt-4">
-          <h2>{t.bySpecies}</h2>
-          {data.speciesCounts.length ? <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {data.speciesCounts.map(({ species, count }) => (
-              <div key={species.id} className="min-w-0 break-words">
-                <dt>{speciesName(species, language)}</dt><dd className="font-semibold tabular-nums">{count}</dd>
-              </div>
-            ))}
-          </dl> : <p className="mt-2">{t.none}</p>}
-        </section>
-        <section className="panel mt-4" aria-labelledby="dashboard-tasks">
-          <div className="registry-heading"><h2 id="dashboard-tasks">{t.upcoming}</h2>
-            <Link className="registry-action" to="/tasks/new">{t.add}</Link>
+        <div className="dashboard-grid">
+          <section className="panel" aria-labelledby="dashboard-tasks">
+            <div className="section-heading"><h2 id="dashboard-tasks">{words.urgent}</h2><div className="flex gap-4"><Link className="subtle-link" to="/tasks">{words.all}</Link>{!readOnly&&<Link className="subtle-link" to="/tasks/new">{t.add}</Link>}</div></div>
+            <ul className="grid grid-cols-2 gap-3">
+              {([
+                [t.overdue,data.taskCounts.overdue,calendar('',shiftDay(today,-1))],
+                [t.today,data.taskCounts.today,calendar(today,today)],
+                [t.week,data.taskCounts.week,calendar(tomorrow,shiftDay(today,7))],
+                [t.month,data.taskCounts.month,calendar(tomorrow,shiftDay(today,30))],
+              ] as const).map(([label,count,url])=><li key={label}>
+                <Link to={url} className="flex min-h-16 items-center justify-between rounded-lg bg-stone-50 px-4 py-3 text-sm">
+                  <span>{label}</span><strong className="text-xl tabular-nums text-pine">{count}</strong>
+                </Link></li>)}
+            </ul>
+          </section>
+          <ClinicalDates data={data} type="vaccination" today={today} language={language}/>
+          <section className="panel">
+            <div className="section-heading"><h2>{t.recent}</h2><Link to="/veterinary" className="subtle-link">{healthStrings[language].veterinary}</Link></div>
+            {data.records.length?<ul className="activity-list divide-y divide-stone-200">
+              {data.records.map(event=>{
+                const animal=data.animals.get(event.animalId)
+                return <li key={event.id}><Link className="registry-link" to={'/veterinary/events/'+event.id}>
+                  {healthStrings[language][event.kind]}{animal?' · '+animalLabel(animal):''}</Link>
+                  <p>{displayEventDate(event,language)}</p></li>
+              })}
+            </ul>:<p className="mt-3 text-sm text-stone-600">{healthStrings[language].empty}</p>}
+          </section>
+          <ClinicalDates data={data} type="checkup" today={today} language={language}/>
+        </div>
+        <section className="panel mt-5">
+          <div className="section-heading"><h2>{words.herd}</h2><Link to="/animals" className="subtle-link">{language==='sq'?'Shih kafshët':'View animals'}</Link></div>
+          <div className="flex flex-wrap gap-x-10 gap-y-4">
+            {([[t.total,data.total],[t.archivedAnimals,data.archived]] as const).map(([label,count])=>
+              <section key={label} aria-label={label}><h3 className="text-sm text-stone-600">{label}</h3><p className="text-xl font-semibold tabular-nums">{count}</p></section>)}
+            {data.speciesCounts.map(({species,count})=><div key={species.id}><p className="text-sm text-stone-600">{speciesName(species,language)}</p><p className="text-xl font-semibold tabular-nums">{count}</p></div>)}
           </div>
-          <ul className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {([
-              [t.overdue, data.taskCounts.overdue, calendar('', shiftDay(today, -1))],
-              [t.today, data.taskCounts.today, calendar(today, today)],
-              [t.week, data.taskCounts.week, calendar(tomorrow, shiftDay(today, 7))],
-              [t.month, data.taskCounts.month, calendar(tomorrow, shiftDay(today, 30))],
-            ] as const).map(([label, count, url]) => (
-              <li key={label} className="min-w-0">
-                <Link to={url} className="block min-h-20 rounded-md border border-stone-300 px-3 py-2 hover:bg-green-50">
-                  <span className="text-sm">{label}</span>
-                  <span className="block text-2xl font-semibold tabular-nums text-pine">{count}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <ClinicalDates data={data} type="vaccination" today={today} language={language} />
-          <ClinicalDates data={data} type="checkup" today={today} language={language} />
-        </div>
-        <section className="panel mt-4">
-          <h2>{t.recent}</h2>
-          {data.records.length ? <ul className="mt-2 divide-y divide-stone-200">
-            {data.records.map((event) => {
-              const animal = data.animals.get(event.animalId)
-              return <li key={event.id} className="py-2">
-                <Link className="registry-link inline-flex min-h-11 items-center break-words" to={'/veterinary/events/' + event.id}>
-                  {healthStrings[language][event.kind]}{animal ? ' · ' + animalLabel(animal) : ''}
-                </Link>
-                <p className="text-sm">{displayEventDate(event, language)}</p>
-              </li>
-            })}
-          </ul> : <p className="mt-2">{healthStrings[language].empty}</p>}
+          {!data.total&&<p className="mt-4 text-sm">{app.empty}</p>}
         </section>
       </>}
-      <p className="mt-6 max-w-xl">{app.localHelp}</p>
     </div>
   )
 }
