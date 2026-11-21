@@ -22,7 +22,9 @@ export function createReminderHandler(options:{
   try{
    const bearer=req.headers.authorization?.slice(7)
    if(req.method==='POST'&&req.headers.authorization?.startsWith('Bearer ')&&tokenSchema.safeParse(bearer).success&&bearer&&bearer.length===options.cronKey.length&&timingSafeEqual(Buffer.from(bearer),Buffer.from(options.cronKey))){
-    return reply(res,200,await options.store.run())
+    const mode=req.headers['x-livestock-dry-run']
+    if(mode!==undefined&&mode!=='0'&&mode!=='1')return reply(res,400,{error:'invalid'})
+    return reply(res,200,await options.store.run(new Date(),{dryRun:mode==='1'}))
    }
    const secret=readCookie(req.headers.cookie),actor=secret&&await options.auth.session(secret)
    if(!actor)return reply(res,401,{error:'authorization'})

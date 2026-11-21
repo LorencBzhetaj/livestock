@@ -60,7 +60,13 @@ test('authenticated enrollment, stable dispatch receipts, expired subscriptions 
   await store.enroll(actor,subscription,prefs)
   expect(await store.status(actor)).toMatchObject({enrolled:true,preferences:prefs})
   await pg.query('INSERT INTO livestock_sync.tasks(farm_id,id,version,payload) VALUES($1,$2,1,$3)',[farm,task.id,task])
-  await store.run(new Date('2026-11-21T09:00:00Z'));await store.run(new Date('2026-11-21T09:01:00Z'))
+  const dry=await store.run(new Date('2026-11-21T09:00:00Z'),{dryRun:true})
+  expect(dry).toEqual({checked:1,eligible:1,accepted:0,dryRun:true})
+  expect(deliver).not.toHaveBeenCalled()
+  expect((await pg.query<{n:number}>('SELECT count(*)::int AS n FROM public.livestock_push_receipts')).rows[0].n).toBe(0)
+  expect((await pg.query<{n:number}>('SELECT count(*)::int AS n FROM public.livestock_push_quota')).rows[0].n).toBe(0)
+  await Promise.all([store.run(new Date('2026-11-21T09:00:00Z')),store.run(new Date('2026-11-21T09:00:00Z'))])
+  await store.run(new Date('2026-11-21T09:01:00Z'))
   expect(deliver).toHaveBeenCalledTimes(1)
   expect(deliver.mock.calls[0]).toBeDefined()
   const nextDevice=id()
@@ -94,6 +100,8 @@ test('Vet and anonymous requests cannot administer reminders or invoke the sched
   expect((await fetch(url,{headers:{cookie:'__Host-livestock-sync=synthetic'}})).status).toBe(403)
   expect((await fetch(url,{method:'POST',headers:{authorization:'Bearer invalid'}})).status).toBe(401)
   expect(store.run).not.toHaveBeenCalled()
+  await fetch(url,{method:'POST',headers:{authorization:'Bearer '+'K'.repeat(43),'x-livestock-dry-run':'1'}})
+  expect(store.run).toHaveBeenCalledWith(expect.any(Date),{dryRun:true})
  }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()))}
 })
 test('reminder push deduplicates and opens only the calendar in scope',async()=>{

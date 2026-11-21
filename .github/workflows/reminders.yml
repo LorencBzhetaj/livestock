@@ -1,15 +1,22 @@
 name: Farm reminder scheduler
 on:
   schedule:
-    - cron: '7,22,37,52 * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Inspect due reminders without sending or reserving attempts
+        type: boolean
+        required: true
+        default: true
 permissions: {}
 concurrency:
   group: farm-reminder-scheduler
   cancel-in-progress: false
 jobs:
   dispatch:
-    if: vars.REMINDERS_SCHEDULER_ENABLED == 'true'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.REMINDERS_SCHEDULER_ENABLED == 'true')
+    environment: m8-preview-notifications
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -18,17 +25,19 @@ jobs:
           REMINDERS_URL: ${{ vars.REMINDERS_URL }}
           REMINDERS_CRON_KEY: ${{ secrets.REMINDERS_CRON_KEY }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
         run: |
           node --input-type=module <<'JS'
           const url=new URL(process.env.REMINDERS_URL);
-          if(url.origin!=='https://livestock-m8-preview-loris-projects-8253d8e3.vercel.app'||url.pathname!=='/api/reminders'||url.search||url.hash)throw Error('Unexpected scheduler target');
+          if(url.origin!=='https://livestock-m8-preview-loris-projects-8253d8e3.vercel.app'||url.pathname!=='/api/reminders'||url.username||url.password||url.search||url.hash)throw Error('Unexpected scheduler target');
           const key=process.env.REMINDERS_CRON_KEY;
           if(!/^[A-Za-z0-9_-]{43}$/.test(key??''))throw Error('Scheduler secret unavailable');
-          const headers={Authorization:'Bearer '+key,'Content-Type':'application/json'};
+          const dryRun=process.env.DRY_RUN==='true';
+          const headers={Authorization:'Bearer '+key,'Content-Type':'application/json','x-livestock-dry-run':dryRun?'1':'0'};
           if(process.env.VERCEL_AUTOMATION_BYPASS_SECRET)headers['x-vercel-protection-bypass']=process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
           const response=await fetch(url,{method:'POST',headers,body:'{}',redirect:'error',signal:AbortSignal.timeout(60000)});
           if(!response.ok)throw Error('Scheduler request failed: '+response.status);
           const result=await response.json();
-          if(!Number.isInteger(result.checked)||!Number.isInteger(result.accepted))throw Error('Unexpected scheduler response');
-          console.log('Authorized scheduler completed.');
+          if(!Number.isInteger(result.checked)||!Number.isInteger(result.eligible)||!Number.isInteger(result.accepted)||result.dryRun!==dryRun)throw Error('Unexpected scheduler response');
+          console.log(JSON.stringify({mode:dryRun?'dry-run':'scheduled-delivery',checked:result.checked,eligible:result.eligible,accepted:result.accepted}));
           JS
