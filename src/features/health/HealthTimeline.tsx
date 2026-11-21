@@ -64,23 +64,27 @@ async function readRecent() {
   return { events, animals }
 }
 
-export function HealthOverview({ language }: { language: Language }) {
+export function HealthOverview({ language, vaccinationOnly=false }: { language: Language; vaccinationOnly?:boolean }) {
   const t = healthStrings[language]
   const result = useLocalQuery(readRecent)
   return (
     <div className="registry">
       <div className="registry-heading">
-        <h1>{t.veterinary}</h1>
+        <h1>{vaccinationOnly?(language==='sq'?'Vaksinimet':'Vaccinations'):t.veterinary}</h1>
         {getAccess()?.role!=='VETERINARIAN'&&<div className="flex flex-wrap gap-2">
-          <Link to="batch" className="registry-action secondary">{t.batch}</Link>
-          <Link to="new" className="registry-action">{t.add}</Link>
+          <Link to="/veterinary/batch" className="registry-action secondary">{t.batch}</Link>
+          <Link to={'/veterinary/new'+(vaccinationOnly?'?kind=vaccination':'')} className="registry-action">{t.add}</Link>
         </div>}
       </div>
+      <nav className="mt-4 flex gap-5" aria-label={language==='sq'?'Pamjet veterinare':'Veterinary views'}>
+        <Link className="subtle-link" to="/veterinary" aria-current={!vaccinationOnly?'page':undefined}>{t.veterinary}</Link>
+        <Link className="subtle-link" to="/vaccinations" aria-current={vaccinationOnly?'page':undefined}>{language==='sq'?'Vaksinimet':'Vaccinations'}</Link>
+      </nav>
       <section className="panel mt-6">
         <h2>{t.recent}</h2>
         {result?.error && <p role="alert" className="registry-error mt-3">{strings[language].error}</p>}
         {!result && <p role="status" className="mt-3">{strings[language].loading}</p>}
-        {result?.data && <EventList {...result.data} language={language} />}
+        {result?.data && <EventList {...result.data} events={vaccinationOnly?result.data.events.filter(event=>event.kind==='vaccination'):result.data.events} language={language} />}
       </section>
     </div>
   )

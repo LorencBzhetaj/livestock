@@ -1,5 +1,7 @@
 # M7B secure push enrollment and delivery
 
+This page retains the original M7B test workflow. The current account-based Preview interface and scheduler use the same delivery infrastructure; see [authenticated reminders and release status](REMINDERS_RELEASE.md).
+
 **Status** — The PostgreSQL adapter and private operator workflow are implemented. Vercel project inspection returned HTTP 403 and no database was verified, provisioned or configured. Testing uses an embedded PostgreSQL engine and a mocked provider. Deployed delivery and the physical iPhone/Android runs are **NOT TESTED**. The M7A local preview sender remains available under its original restrictions.
 
 ## Boundary and retention

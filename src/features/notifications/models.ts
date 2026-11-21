@@ -10,9 +10,14 @@ export const notificationPreferences = z.strictObject({
 export type NotificationPreferences = z.infer<typeof notificationPreferences>
 
 export const publicKeySchema = z.string().regex(/^B[A-Za-z0-9_-]{86}$/)
+export const scheduledPushStateSchema=z.object({
+ publicKey:publicKeySchema,enrolled:z.boolean(),backgroundReady:z.boolean().default(false),
+ preferences:notificationPreferences.extend({enabled:z.boolean(),timeZone:z.string()}).optional(),
+ devices:z.array(z.object({id:z.uuid(),label:z.string()})),
+})
 export const pushConfigSchema = z.strictObject({ publicKey: publicKeySchema.nullable(), testEnabled: z.boolean(), enrollmentEnabled: z.boolean().optional(), enrolled: z.boolean().optional(),
   lastTest: z.enum(['serverAccepted', 'providerAccepted', 'providerRejected']).optional() })
-export const pushMessageSchema = z.strictObject({ kind: z.literal('test'), id: z.uuid(), language: notificationLanguage })
+export const pushMessageSchema = z.strictObject({ kind: z.enum(['test','reminder']), id: z.uuid(), language: notificationLanguage })
 export type PushMessage = z.infer<typeof pushMessageSchema>
 export const testRequestSchema = z.strictObject({
   endpointHash: z.string().regex(/^[0-9a-f]{64}$/), language: notificationLanguage,

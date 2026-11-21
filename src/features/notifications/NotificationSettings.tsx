@@ -7,10 +7,15 @@ import { sha256 } from '../../lib/sha256'
 import { useLocalQuery } from '../animals/shared'
 import { capabilities, durableAction, loadPushConfig, requestNotificationPermission, sendTest, subscribeDevice } from './client'
 import { notificationPreferences, preferenceKey } from './models'
+import {authRequired} from '../auth/access'
+import ScheduledSettings from './ScheduledSettings'
 
 const readPreferences = () => repositories.settings.get(preferenceKey)
 
 export default function NotificationSettings({ language, online }: { language: Language; online: boolean }) {
+  return authRequired()?<ScheduledSettings language={language} online={online}/>:<LegacySettings language={language} online={online}/>
+}
+function LegacySettings({language,online}:{language:Language;online:boolean}){
   const t = notificationStrings[language]
   const [registration, setRegistration] = useState<ServiceWorkerRegistration>()
   const [subscription, setSubscription] = useState<PushSubscription | null>()

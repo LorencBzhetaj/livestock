@@ -1,4 +1,4 @@
-import { getAccess } from '../features/auth/access'
+import { getAccess,authRequired } from '../features/auth/access'
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react'
 import { liveQuery } from 'dexie'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
@@ -57,6 +57,12 @@ export function App() {
   }, [])
 
   useEffect(() => watchPwa(setPwa), [])
+  useEffect(()=>{
+    if(!authRequired()||readOnly)return
+    let disposed=false,stop:(()=>void)|undefined
+    void import('../features/notifications/preferences').then(({watchReminderPreferences})=>{if(!disposed)stop=watchReminderPreferences(database)})
+    return()=>{disposed=true;stop?.()}
+  },[readOnly])
   useEffect(() => listenForRestore(() => setPeerRestore(true)), [])
 
   useEffect(() => {
@@ -95,6 +101,9 @@ export function App() {
         <Route path="/veterinary/*" element={
           <Suspense fallback={<p role="status">{t.loading}</p>}><HealthRoutes language={language} /></Suspense>
         } />
+        <Route path="/vaccinations" element={<Suspense fallback={<p role="status">{t.loading}</p>}><HealthRoutes language={language} vaccinationOnly /></Suspense>} />
+        <Route path="/reports" element={<Suspense fallback={<p role="status">{t.loading}</p>}><Dashboard language={language} reports /></Suspense>} />
+        <Route path="/backup" element={readOnly ? <Navigate to="/" replace /> : <Suspense fallback={<p role="status">{t.loading}</p>}><BackupSettings language={language} /></Suspense>} />
         <Route path="/settings" element={readOnly ? <Navigate to="/" replace /> :
           <>
             <h1>{t.settings}</h1>

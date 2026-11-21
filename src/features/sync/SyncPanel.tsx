@@ -10,8 +10,8 @@ import { watchSync, type SyncStatus } from './coordinator'
 import { devicesSchema, type Mutation, type Session } from './protocol'
 
 const sq = {
-  title: 'Të dhënat e fermës', unlinked: 'Shqyrto të dhënat për të filluar.', offline: 'Pa internet', pending: 'Ndryshime në pritje',
-  working: 'Duke përditësuar…', synced: 'Të përditësuara', conflict: 'Konflikt për shqyrtim',
+  title: 'Të dhënat e fermës', unlinked: 'Shqyrto të dhënat për të filluar.', offline: 'Pa internet', pending: 'Në pritje',
+  working: 'Duke sinkronizuar…', synced: 'Sinkronizuar', conflict: 'Kërkon vëmendje',
   failed: 'Sinkronizimi dështoi. Të dhënat lokale ruhen.', code: 'Kodi i regjistrimit të pajisjes',
   device: 'Emri i pajisjes', enroll: 'Regjistro pajisjen', review: 'Shqyrto të dhënat', confirm: 'Konfirmo dhe vazhdo',
   sync: 'Sinkronizo tani', invite: 'Krijo kod për një pajisje tjetër', hide: 'Fshih kodin', devices: 'Pajisjet',

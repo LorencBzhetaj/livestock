@@ -87,3 +87,5 @@ Backups are unencrypted private files. Keep copies in locations you control, and
 See the [PWA compatibility and update policy](docs/PWA_READINESS.md) and the [physical-device checklist](docs/PHYSICAL_DEVICE_CHECKLIST.md). The physical iPhone, Android, and desktop installation checks remain **NOT TESTED**.
 
 See [M7A Web Push](docs/WEB_PUSH.md) for test-only authorization, environment setup and the device delivery checklist. See [the roadmap](docs/ROADMAP.md) and [the implementation guidance](AGENTS.md).
+
+The current mockup-based interface and authenticated Preview reminders are described in [the release and notification guide](docs/REMINDERS_RELEASE.md). Normal device notification setup is in Settings and uses the signed-in Admin account. Background scheduling remains visibly pending until its authorized external trigger has been configured and verified; no physical delivery is claimed.

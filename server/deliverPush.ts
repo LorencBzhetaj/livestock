@@ -10,7 +10,7 @@ export async function deliverPush(subscription: EnrolledSubscription, message: P
   const resolver = new Resolver({ timeout: 2500, tries: 1 })
   const address = selectPublicAddress(await resolver.resolve4(endpoint.hostname))
   const details = webPush.generateRequestDetails(subscription, JSON.stringify(message), {
-    TTL: 60, topic: 'livestockos-test', timeout: 10_000, vapidDetails: vapid,
+    TTL: message.kind==='reminder'?86400:60, topic: message.kind==='reminder'?'livestockos-reminders':'livestockos-test', timeout: 10_000, vapidDetails: vapid,
   })
   // Connect to the validated IP with the provider's TLS name and Host header. No second lookup, proxy or redirect.
   return await new Promise<number>((resolve, reject) => {

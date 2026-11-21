@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import {mkdir} from 'node:fs/promises'
 
 test.use({ timezoneId: 'America/Los_Angeles' })
 const instant = new Date('2026-03-09T06:30:00Z')
@@ -12,7 +13,7 @@ async function offline(page: Page) {
 test('creates, edits, reschedules, filters, completes and cancels tasks offline across local midnight', async ({ page }) => {
   await page.clock.setFixedTime(instant)
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Si është ferma sot?' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Përshëndetje, fermer' })).toBeVisible()
   await offline(page)
   await page.getByRole('link', { name: 'Shto detyrë' }).click()
   await expect(page.getByLabel('Data e afatit')).toHaveValue(today)
@@ -70,7 +71,7 @@ test('creates, edits, reschedules, filters, completes and cancels tasks offline 
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width)
 })
 
-test('shows live counts for 200 animals and creates one confirmed reminder from the latest record offline', async ({ page }) => {
+test('shows live counts for 200 animals and creates one confirmed reminder from the latest record offline', async ({ page },testInfo) => {
   await page.clock.setFixedTime(instant)
   await page.goto('/settings')
   await page.getByLabel('Gjuha', { exact: true }).selectOption('en')
@@ -105,6 +106,14 @@ test('shows live counts for 200 animals and creates one confirmed reminder from 
   await expect(page.getByText('Sheep', { exact: true })).toBeVisible()
   await expect(page.getByText('Date from the veterinary record')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Next 7 days 0' })).toBeVisible()
+  await mkdir('.codex/visual-checks',{recursive:true})
+  await page.getByRole('navigation').getByRole('link',{name:'Settings',exact:true}).click()
+  await page.getByLabel('Language',{exact:true}).selectOption('sq')
+  await page.getByRole('navigation').getByRole('link',{name:'Kreu',exact:true}).click()
+  await expect(page.getByRole('heading',{name:'Përshëndetje, fermer'})).toBeVisible()
+  await page.screenshot({path:'.codex/visual-checks/mockup-200-'+testInfo.project.name+'.png',fullPage:testInfo.project.name!=='mobile'})
+  await page.getByRole('navigation').getByRole('link',{name:'Cilësimet',exact:true}).click()
+  await page.getByLabel('Gjuha',{exact:true}).selectOption('en')
 
   await page.goto(original)
   await page.getByRole('link', { name: 'Add amendment' }).click()

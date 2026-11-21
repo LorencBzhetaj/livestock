@@ -7,7 +7,7 @@ test('installed shell and local records survive offline navigation and reopen', 
   })
 
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Si është ferma sot?' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Përshëndetje, fermer' })).toBeVisible()
   await expect(page.getByText('Nuk ka ende kafshë të regjistruara.')).toBeVisible()
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true)
   const manifest = await page.request.get('/manifest.webmanifest')

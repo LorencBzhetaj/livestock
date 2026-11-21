@@ -6,7 +6,8 @@ import { HealthDetails } from './HealthDetails'
 import { NewHealthEvent } from './HealthForm'
 import { HealthOverview } from './HealthTimeline'
 
-export default function HealthRoutes({ language }: { language: Language }) {
+export default function HealthRoutes({ language, vaccinationOnly=false }: { language: Language; vaccinationOnly?:boolean }) {
+  if(vaccinationOnly)return <HealthOverview language={language} vaccinationOnly />
   return (
     <Routes>
       <Route index element={<HealthOverview language={language} />} />

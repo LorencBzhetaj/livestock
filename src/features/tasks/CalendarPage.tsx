@@ -20,6 +20,7 @@ export function CalendarPage({ language }: { language: Language }) {
   const labels = animalStrings[language]
   const today = useToday()
   const [params] = useSearchParams()
+  const listView=params.get('view')==='list'
   const [filters, setFilters] = useState<TaskFilter>(() => {
     const shape = taskFilterSchema.shape
     return {
@@ -49,16 +50,25 @@ export function CalendarPage({ language }: { language: Language }) {
           (pending && filters.status && filters.status !== 'pending')) return Promise.resolve([])
       return repositories.tasks.range({ ...range, status: pending ? 'pending' : filters.status })
     }
-    const [monthTasks, upcoming, overdue] = await Promise.all([
+    const [monthTasks, upcoming, overdue, list] = await Promise.all([
       read(month, shiftDay(shiftMonth(month, 1), -1)),
       read(today, shiftDay(today, 30), true), read(undefined, shiftDay(today, -1), true),
+      listView?read():Promise.resolve([]),
     ])
-    return { groups: groupByDueDate(monthTasks), upcoming, overdue }
-  }, [filters, month, today])
+    return { groups: groupByDueDate(monthTasks), upcoming, overdue, list }
+  }, [filters, month, today,listView])
   const result = useLocalQuery(query)
   const data = result?.data
   const animalResult = useLocalQuery(repositories.animals.list)
   const animals = useMemo(() => new Map(animalResult?.data?.map((animal) => [animal.id, animal])), [animalResult])
+  const clinicalQuery=useCallback(async()=>{
+    if(filters.status&&filters.status!=='pending')return []
+    const sources=await repositories.health.upcomingSources(filters.from,filters.to??shiftDay(today,30))
+    return (await Promise.all(sources.map(async source=>
+      (!filters.type||filters.type===source.type)&&(!filters.animalId||filters.animalId===source.event.animalId)&&!await repositories.tasks.reminderFor(source.rootId,source.type)?source:undefined,
+    ))).flatMap(source=>source?[source]:[])
+  },[filters,today])
+  const clinical=useLocalQuery(clinicalQuery)
 
   function change(key: keyof TaskFilter, value: string) {
     const parsed = taskFilterSchema.shape[key].safeParse(value || undefined)
@@ -70,7 +80,7 @@ export function CalendarPage({ language }: { language: Language }) {
   return (
     <div className="registry">
       <div className="registry-heading">
-        <h1>{t.calendar}</h1>
+        <h1>{listView?(language==='sq'?'Detyrat':'Tasks'):t.calendar}</h1>
         {getAccess()?.role!=='VETERINARIAN'&&<Link to={'/tasks/new?date=' + day} className="registry-action">{t.add}</Link>}
       </div>
       <section className="panel mt-6">
@@ -96,7 +106,8 @@ export function CalendarPage({ language }: { language: Language }) {
       </section>
       {!result && <p className="mt-3" role="status">{strings[language].loading}</p>}
       {(result?.error || animalResult?.error) && <p className="registry-error mt-3" role="alert">{strings[language].error}</p>}
-      <section className="panel mt-4" aria-labelledby="calendar-month">
+      {listView&&data&&<section className="panel mt-4"><TaskList language={language} today={today} animals={animals} tasks={data.list}/></section>}
+      {!listView&&<section className="panel mt-4" aria-labelledby="calendar-month">
         <div className="registry-heading">
           <h2 id="calendar-month" className="capitalize">{monthLabel.format(new Date(month + 'T00:00:00Z'))}</h2>
           <div className="flex flex-wrap gap-2">
@@ -122,8 +133,16 @@ export function CalendarPage({ language }: { language: Language }) {
             </button>
           })}
         </div>
-      </section>
-      {data && <>
+      </section>}
+      {clinical?.data&&clinical.data.length>0&&<section className="panel mt-4" aria-labelledby="recorded-clinical-dates">
+        <h2 id="recorded-clinical-dates">{language==='sq'?'Datat veterinare të regjistruara':'Recorded veterinary dates'}</h2>
+        <p className="mt-2 text-sm">{t.recorded}</p>
+        <ul className="mt-3 divide-y divide-stone-200">{clinical.data.map(source=><li key={source.rootId} className="py-3">
+          <Link className="registry-link" to={'/veterinary/events/'+source.event.id}>{t[source.type]}{animals.get(source.event.animalId)?' · '+animalLabel(animals.get(source.event.animalId)!):''}</Link>
+          <p className={'mt-1 text-sm '+(source.dueDate<today?'registry-error':'')}><time dateTime={source.dueDate}>{displayDate(source.dueDate,language)}</time>{source.dueDate<today?' · '+t.overdue:''}</p>
+        </li>)}</ul>
+      </section>}
+      {data && !listView && <>
         <section className="panel mt-4" aria-labelledby="calendar-agenda">
           <div className="registry-heading">
             <h2 id="calendar-agenda">{t.agenda}</h2>

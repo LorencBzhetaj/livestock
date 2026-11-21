@@ -45,6 +45,6 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   if (!event.notification.tag.startsWith('livestockos-test-')) return
   event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) =>
-    openNotification(self.registration.scope, windows, (url) => self.clients.openWindow(url)),
+    openNotification(self.registration.scope, windows, (url) => self.clients.openWindow(url), event.notification.data?.path),
   ))
 })

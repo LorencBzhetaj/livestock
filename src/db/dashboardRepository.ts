@@ -31,6 +31,7 @@ export function createDashboardRepository(
       ])
       const animals = new Map((await db.animals.bulkGet([...ids]))
         .flatMap((animal) => animal ? [[animal.id, animal] as const] : []))
-      return { total, active, archived, speciesCounts, taskCounts, records, clinicalTasks, clinicalDates, animals }
+      const openTasks = await db.tasks.where('status').equals('pending').count()
+      return { total, active, archived, speciesCounts, taskCounts, records, clinicalTasks, clinicalDates, animals, upcoming, openTasks }
     })
 }

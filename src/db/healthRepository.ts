@@ -90,18 +90,18 @@ export function createHealthRepository(db: LivestockDatabase) {
   return {
     latest: (id: string) => db.transaction('r', db.healthEvents, async () => await lineage(id)),
     reminderSource,
-    upcomingSources: (from: string, to: string) => db.transaction('r', [db.healthEvents, db.vaccinations], async () => {
+    upcomingSources: (from: string | undefined, to: string) => db.transaction('r', [db.healthEvents, db.vaccinations], async () => {
       // Include adjacent UTC days for legacy instant-based dates displayed locally.
-      const lower = shiftDay(from, -1)
+      const lower = from?shiftDay(from, -1):undefined
       const upper = shiftDay(to, 2)
       const [vaccinations, followUps] = await Promise.all([
-        db.vaccinations.where('nextDueAt').between(lower, upper).toArray(),
-        db.healthEvents.where('followUpAt').between(lower, upper).toArray(),
+        lower?db.vaccinations.where('nextDueAt').between(lower, upper).toArray():db.vaccinations.where('nextDueAt').below(upper).toArray(),
+        lower?db.healthEvents.where('followUpAt').between(lower, upper).toArray():db.healthEvents.where('followUpAt').below(upper).toArray(),
       ])
       const candidates = new Set([...vaccinations.map(({ healthEventId }) => healthEventId), ...followUps.map(({ id }) => id)])
       const sources = await Promise.all([...candidates].map(reminderSource))
       return [...new Map(sources.flatMap((source) =>
-        source && source.dueDate >= from && source.dueDate <= to ? [[source.rootId, source] as const] : [],
+        source && (!from||source.dueDate >= from) && source.dueDate <= to ? [[source.rootId, source] as const] : [],
       )).values()].sort((a, b) => a.dueDate.localeCompare(b.dueDate))
     }),
     list: (animalId: string) => db.healthEvents.where('animalId').equals(animalId).toArray(),

@@ -31,6 +31,13 @@ async function record(entry: VeterinaryEntry, amendment?: { eventId: string; rea
   return receipt.results[0].eventId
 }
 
+test('recorded overdue clinical dates remain readable without creating a duplicate task',async()=>{
+ const event=await record({kind:'checkup',date:'2026-11-01',reason:'Synthetic visit',followUpDate:'2026-11-02'})
+ expect(await repo.health.upcomingSources(today,'2026-12-01')).toHaveLength(0)
+ expect(await repo.health.upcomingSources(undefined,'2026-12-01')).toMatchObject([{event:{id:event},dueDate:'2026-11-02'}])
+ expect(await repo.tasks.range()).toHaveLength(0)
+})
+
 test('creates, edits and reschedules a task, then retains completion and cancellation history', async () => {
   const saved = await repo.tasks.create({ ...draft, animalId: animal.id, description: 'First' })
   await expect(repo.tasks.edit(saved.id, { ...draft, dueDate: '2026-02-30' })).rejects.toThrow()
