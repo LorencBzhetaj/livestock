@@ -1,5 +1,5 @@
 import type {IncomingMessage,ServerResponse} from 'node:http'
-import {timingSafeEqual} from 'node:crypto'
+import {createHash,timingSafeEqual} from 'node:crypto'
 import {z} from 'zod'
 import {createAuthStore,readCookie} from '../server/authStore.js'
 import {postgresTransactions} from '../server/pushDatabase.js'
@@ -16,7 +16,7 @@ export const reminderRequest=z.discriminatedUnion('action',[
  z.strictObject({action:z.literal('test'),requestId:z.uuid()}),
 ])
 export function createReminderHandler(options:{
- origin:string;publicKey:string;cronKey:string;backgroundReady?:boolean;auth:ReturnType<typeof createAuthStore>;store:ReturnType<typeof createReminderStore>
+ origin:string;publicKey:string;cronKey:string;targetFingerprint?:string;backgroundReady?:boolean;auth:ReturnType<typeof createAuthStore>;store:ReturnType<typeof createReminderStore>
 }){
  return async(req:IncomingMessage,res:ServerResponse)=>{
   try{
@@ -24,7 +24,8 @@ export function createReminderHandler(options:{
    if(req.method==='POST'&&req.headers.authorization?.startsWith('Bearer ')&&tokenSchema.safeParse(bearer).success&&bearer&&bearer.length===options.cronKey.length&&timingSafeEqual(Buffer.from(bearer),Buffer.from(options.cronKey))){
     const mode=req.headers['x-livestock-dry-run']
     if(mode!==undefined&&mode!=='0'&&mode!=='1')return reply(res,400,{error:'invalid'})
-    return reply(res,200,await options.store.run(new Date(),{dryRun:mode==='1'}))
+    const result=await options.store.run(new Date(),{dryRun:mode==='1'})
+    return reply(res,200,{...result,...(mode==='1'?{connectionTarget:options.targetFingerprint}:{})})
    }
    const secret=readCookie(req.headers.cookie),actor=secret&&await options.auth.session(secret)
    if(!actor)return reply(res,401,{error:'authorization'})
@@ -48,11 +49,13 @@ function configure(env:NodeJS.ProcessEnv){
  if(env.VERCEL_ENV!=='preview'||env.REMINDERS_ENABLED!=='1'||env.AUTH_ENABLED!=='1'||!env.SYNC_DATABASE_URL)return
  try{
   const url=new URL(env.SYNC_DATABASE_URL),origin=env.SYNC_ALLOWED_ORIGIN
+  const targetFingerprint=createHash('sha256').update(url.hostname.replace('-pooler.','.')).digest('hex')
+  if(!/^[a-f0-9]{64}$/.test(env.REMINDERS_EXPECTED_HOST_HASH??'')||targetFingerprint!==env.REMINDERS_EXPECTED_HOST_HASH)return
   const publicKey=publicPushKey(env),privateKey=tokenSchema.parse(env.PUSH_VAPID_PRIVATE_KEY),serverKey=tokenSchema.parse(env.PUSH_SERVER_KEY),cronKey=tokenSchema.parse(env.REMINDERS_CRON_KEY),subject=env.PUSH_VAPID_SUBJECT
   const validContact=subject&&(subject.startsWith('mailto:')?z.email().safeParse(subject.slice(7)).success:subject.startsWith('https://')&&URL.canParse(subject))
   if(url.pathname!=='/livestock_m8_preview'||url.username!=='livestock_sync_runtime'||url.searchParams.get('sslmode')!=='verify-full'||!origin?.startsWith('https://')||new URL(origin).origin!==origin||!publicKey||!validContact||!subject)return
   const transaction=postgresTransactions(url.href)
-  return createReminderHandler({origin,publicKey,cronKey,backgroundReady:env.REMINDERS_SCHEDULER_READY==='1',auth:createAuthStore(transaction),store:createReminderStore(transaction,pushSecrets(Buffer.from(serverKey,'base64url')),(subscription,message)=>deliverPush(subscription,message,{subject,publicKey,privateKey}))})
+  return createReminderHandler({origin,publicKey,cronKey,targetFingerprint,backgroundReady:env.REMINDERS_SCHEDULER_READY==='1',auth:createAuthStore(transaction),store:createReminderStore(transaction,pushSecrets(Buffer.from(serverKey,'base64url')),(subscription,message)=>deliverPush(subscription,message,{subject,publicKey,privateKey}))})
  }catch{return}
 }
 const handler=configure(process.env)

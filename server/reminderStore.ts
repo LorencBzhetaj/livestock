@@ -69,6 +69,7 @@ export function createReminderStore(transaction:Transaction,secrets:Secrets,deli
    return send(binding,id,reminderPreferences.parse(binding.preferences).language,'test')
   },
   run:async(now=new Date(),{dryRun=false}:{dryRun?:boolean}={})=>{
+   const identity=dryRun?await transaction(async sql=>(await sql.query<{database:string;databaseRole:string}>('SELECT current_database() AS database,current_user AS "databaseRole"')).rows[0]):undefined
    const bindings=await transaction(sql=>sql.query<Binding&{farm_id:string}>(active+' AND (b.preferences->>\'enabled\')::boolean ORDER BY b.sync_device_id LIMIT 100'))
    let accepted=0,eligible=0
    for(const binding of bindings.rows){
@@ -85,7 +86,7 @@ export function createReminderStore(transaction:Transaction,secrets:Secrets,deli
     const result=await send(binding,summaryId(binding.push_device_id,localClock(now,prefs.timeZone).date),prefs.language,'reminder')
     if(result==='providerAccepted')accepted++
    }
-   return {checked:bindings.rows.length,eligible,accepted,dryRun}
+   return {checked:bindings.rows.length,eligible,accepted,dryRun,...(identity??{})}
   },
  }
 }

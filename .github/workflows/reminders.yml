@@ -23,6 +23,7 @@ jobs:
       - name: Invoke the authorized Preview scheduler
         env:
           REMINDERS_URL: ${{ vars.REMINDERS_URL }}
+          REMINDERS_TARGET_FINGERPRINT: ${{ vars.REMINDERS_TARGET_FINGERPRINT }}
           REMINDERS_CRON_KEY: ${{ secrets.REMINDERS_CRON_KEY }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
@@ -39,5 +40,6 @@ jobs:
           if(!response.ok)throw Error('Scheduler request failed: '+response.status);
           const result=await response.json();
           if(!Number.isInteger(result.checked)||!Number.isInteger(result.eligible)||!Number.isInteger(result.accepted)||result.dryRun!==dryRun)throw Error('Unexpected scheduler response');
+          if(dryRun&&(result.database!=='livestock_m8_preview'||result.databaseRole!=='livestock_sync_runtime'||result.connectionTarget!==process.env.REMINDERS_TARGET_FINGERPRINT))throw Error('Scheduler database target mismatch');
           console.log(JSON.stringify({mode:dryRun?'dry-run':'scheduled-delivery',checked:result.checked,eligible:result.eligible,accepted:result.accepted}));
           JS

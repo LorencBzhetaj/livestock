@@ -61,7 +61,7 @@ test('authenticated enrollment, stable dispatch receipts, expired subscriptions 
   expect(await store.status(actor)).toMatchObject({enrolled:true,preferences:prefs})
   await pg.query('INSERT INTO livestock_sync.tasks(farm_id,id,version,payload) VALUES($1,$2,1,$3)',[farm,task.id,task])
   const dry=await store.run(new Date('2026-11-21T09:00:00Z'),{dryRun:true})
-  expect(dry).toEqual({checked:1,eligible:1,accepted:0,dryRun:true})
+  expect(dry).toMatchObject({checked:1,eligible:1,accepted:0,dryRun:true,databaseRole:'livestock_sync_runtime'})
   expect(deliver).not.toHaveBeenCalled()
   expect((await pg.query<{n:number}>('SELECT count(*)::int AS n FROM public.livestock_push_receipts')).rows[0].n).toBe(0)
   expect((await pg.query<{n:number}>('SELECT count(*)::int AS n FROM public.livestock_push_quota')).rows[0].n).toBe(0)
