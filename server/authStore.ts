@@ -52,7 +52,8 @@ export function createAuthStore(transaction:Transaction) {
     if(secret) await transaction(sql=>sql.query('UPDATE livestock_sync.devices SET revoked_at=now() WHERE token_digest=$1',[hash(secret)]))
     return {status:200,value:{loggedOut:true},cookie:cookie('',false)}
    }
-   if(!await limit('global',60) || !await limit('ip:'+hash(ip),20)) return {status:429,value:{error:'limited'}}
+   // scrypt keeps each guess expensive. Wide global and per-name ceilings stop one client from locking out the owner.
+   if(!await limit('global',300) || !await limit('ip:'+hash(ip),20)) return {status:429,value:{error:'limited'}}
    if(input.action==='setup' && input.username!=='adi') return {status:400,value:{error:'username'}}
    if(input.action==='vet') {
     const actor=secret && await transaction(sql=>session(sql,secret))
@@ -81,7 +82,7 @@ export function createAuthStore(transaction:Transaction) {
      return {status:200,value:{saved:true}}
     })
    }
-   if(!await limit('name:'+hash(input.username),5)) return {status:429,value:{error:'limited'}}
+   if(!await limit('name-ip:'+hash(input.username+'\n'+ip),5) || !await limit('name:'+hash(input.username),50)) return {status:429,value:{error:'limited'}}
    let account:Account|undefined
    if(input.action==='login') {
     account=(await transaction(sql=>sql.query<Account>('SELECT * FROM livestock_sync.accounts WHERE username=$1',[input.username]))).rows[0]

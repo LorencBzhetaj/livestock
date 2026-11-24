@@ -34,6 +34,9 @@ export function Shell({language,online,children}:{language:Language;online:boole
     <Link to="/tasks?status=pending" className="notification-bell" aria-label={en?'Reminders':'Kujtesat'}><Icon name="bell"/></Link>
     <span className="workspace-account"><Icon name="user"/><span><strong>{getAccess()?.username??'LivestockOS'}</strong><small>{readOnly?(en?'Read only':'Vetëm lexim'):'Admin'}</small></span></span>
    </div></header>
+   <nav aria-label={en?'More pages':'Më shumë faqe'} className="mobile-more">
+    {items.filter(item=>!item.mobile).map(item=><Link key={item.to} to={item.to} aria-current={active(item.to)?'page':undefined}><Icon name={item.icon}/><span>{item.name}</span></Link>)}
+   </nav>
    <main id="main" tabIndex={-1} className="app-main">{children}</main>
   </div>
  </div>
