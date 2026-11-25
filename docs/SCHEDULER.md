@@ -31,4 +31,11 @@ This is covered by `tests/reminders.test.ts`, including concurrent runs. So any 
 | Safety net | Vercel Cron, once a day, on Production: `{"crons":[{"path":"/api/reminders","schedule":"30 17 * * *"}]}`. Set `CRON_SECRET` to the same value as `REMINDERS_CRON_KEY`. | Daily; on Hobby the run can fire at any minute of that hour | Free on Hobby (limited to once a day) |
 | Backup | The existing GitHub workflow, with a Production job added later | Best effort | Free |
 
-**The scheduler needs a decision from you.** Vercel Cron runs only on Production deployments. Adding `crons` to `vercel.json` changes Production configuration and is therefore part of the deploy approval.
+## Decision (25 Nov 2026): free daily Vercel Cron
+The owner chose the free option. Reminders are counted in days (before a vaccination or task date), so one run each morning is enough.
+
+- **Trigger:** Vercel Cron on Production, `0 7 * * *` (07:00 UTC), set in `vercel.json`. On the Hobby plan it fires at some minute within that hour, which is 08:00–08:59 in Tirana in winter and 09:00–09:59 in summer. `CRON_SECRET` holds the same value as `REMINDERS_CRON_KEY`, so the GET carries the right bearer key.
+- **Reminder time:** the Settings form limits the time to 08:00 or earlier, because a later time would never be reached by a morning run.
+- **Which days:** a reminder 7, 3 and 1 day before a date, and on the day (`reminderDays` in `server/reminderSchedule.ts`; the lead defaults to 7, and a larger lead adds one earlier reminder). A pending task that is past its date repeats every day until it is done or cancelled. A recorded next-vaccination date without a task is announced only on those days.
+- **GitHub:** the workflow stays pointed at Preview. No external cron account and no cost.
+- **If a run is missed:** the next day's run still sends whatever is due that day. Each device gets at most one digest per local day.
