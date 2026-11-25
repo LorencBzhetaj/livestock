@@ -1,7 +1,7 @@
 import {lazy,Suspense,useEffect,useState} from 'react'
 import {authSession,passwordMinimum,type AuthSession} from './protocol'
 import {setAccess} from './access'
-import {useLocation} from 'react-router-dom'
+import {AccountContext,type AccountControls} from './account'
 const App=lazy(()=>import('../../app/App').then(m=>({default:m.App})))
 const cacheKey='livestock-auth-profile'
 type Profile={session:AuthSession;database:string}
@@ -11,7 +11,8 @@ const sq={
  error:'Hyrja dështoi. Kontrollo të dhënat ose prit para se të provosh përsëri.',
  logout:'Dil',vet:'Llogaria e veterinerit',current:'Fjalëkalimi yt aktual',save:'Ruaj llogarinë e veterinerit',
  done:'Llogaria u ruajt.',claim:'Konfirmoj lidhjen e të dhënave lokale ekzistuese me këtë llogari Admin.',
- readOnly:'Vetëm lexim',local:'Përdor të dhënat lokale ekzistuese',minimum:`Të paktën ${passwordMinimum} karaktere.`,
+ readOnly:'Vetëm lexim',local:'Përdor të dhënat lokale ekzistuese',minimum:`Të paktën ${passwordMinimum} karaktere.`,close:'Mbyll',
+ vetHelp:'Veterineri sheh të dhënat e fermës, por nuk mund t\'i ndryshojë. Konfirmo me fjalëkalimin tënd.',
 }
 const en:typeof sq={
  title:'Sign in to LivestockOS',username:'Username',password:'Password',remember:'Remember this device',
@@ -19,7 +20,8 @@ const en:typeof sq={
  error:'Sign-in failed. Check the details or wait before trying again.',
  logout:'Sign out',vet:'Veterinarian account',current:'Your current password',save:'Save veterinarian account',
  done:'Account saved.',claim:'I confirm linking existing local records to this Admin account.',
- readOnly:'Read only',local:'Use existing local records',minimum:`At least ${passwordMinimum} characters.`,
+ readOnly:'Read only',local:'Use existing local records',minimum:`At least ${passwordMinimum} characters.`,close:'Close',
+ vetHelp:'The veterinarian can view farm records but cannot change them. Confirm with your own password.',
 }
 async function call(input:object) {
  const res=await fetch('/api/auth',{method:'POST',credentials:'same-origin',cache:'no-store',
@@ -50,7 +52,6 @@ function PasswordField({label,name,minimum,autoComplete,language}:{label:string;
 }
 
 export default function Gate(){
- const route=useLocation()
  const [profile,setProfile]=useState<Profile>()
  const [ready,setReady]=useState(false)
  const [language,setLanguage]=useState<'sq'|'en'>('sq')
@@ -215,36 +216,39 @@ export default function Gate(){
    </div>
   </main>
  </div>
- return <>
-  <section className="account-toolbar" aria-label={language==='sq'?'Llogaria':'Account'}>
-   <select aria-label="Account language" value={language} onChange={async e=>{
-    const value=e.target.value as 'sq'|'en';setLanguage(value)
-    const {repositories}=await import('../../db/repositories')
-    await repositories.settings.save({key:'language',value,updatedAt:new Date().toISOString()})
-   }}><option value="sq">Shqip</option><option value="en">English</option></select>
-   <span>{profile.session.username}{profile.session.role==='VETERINARIAN'?' · '+t.readOnly:''}</span>
-   <button disabled={busy} onClick={async()=>{
-    setBusy(true)
-    try{
-     if(navigator.onLine)await call({action:'logout'})
-     localStorage.setItem('livestock-auth-signed-out','1')
-     localStorage.removeItem(cacheKey);setAccess();setProfile(undefined);location.reload()
-    }catch{setError(true)}finally{setBusy(false)}
-   }}>{t.logout}</button>
-   {profile.session.role==='ADMIN'&&route.pathname==='/settings'&&<button onClick={()=>setAccountForm(!accountForm)}>{t.vet}</button>}
-  </section>
-  {error&&<p role="alert">{t.error}</p>}
-  {accountForm&&route.pathname==="/settings"&&<form aria-label={t.vet} className="panel account-panel" onSubmit={async e=>{
+ const account:AccountControls={
+  username:profile.session.username,role:profile.session.role,language,busy,
+  setLanguage:async value=>{
+   setLanguage(value)
+   const {repositories}=await import('../../db/repositories')
+   await repositories.settings.save({key:'language',value,updatedAt:new Date().toISOString()})
+  },
+  logout:async()=>{
+   setBusy(true)
+   try{
+    if(navigator.onLine)await call({action:'logout'})
+    localStorage.setItem('livestock-auth-signed-out','1')
+    localStorage.removeItem(cacheKey);setAccess();setProfile(undefined);location.reload()
+   }catch{setError(true)}finally{setBusy(false)}
+  },
+  openVet:()=>{setSaved(false);setAccountForm(true)},
+ }
+ return <AccountContext.Provider value={account}>
+  {error&&<p role="alert" className="account-error">{t.error}</p>}
+  {accountForm&&profile.session.role==='ADMIN'&&<div className="sheet-layer">
+   <div className="sheet-backdrop" onClick={()=>setAccountForm(false)}/>
+   <form aria-label={t.vet} role="dialog" aria-modal="true" className="panel account-panel" onKeyDown={e=>{if(e.key==='Escape')setAccountForm(false)}} onSubmit={async e=>{
    e.preventDefault();const form=e.currentTarget,data=new FormData(form);setBusy(true);setError(false);setSaved(false)
    try{await call({action:'vet',username:data.get('username'),password:data.get('password'),currentPassword:data.get('currentPassword')});form.reset();setSaved(true)}catch{setError(true)}finally{setBusy(false)}
   }}>
-   <h2>{t.vet}</h2>
+   <div className="sheet-heading"><h2>{t.vet}</h2><button type="button" className="icon-button" onClick={()=>setAccountForm(false)}>{t.close}</button></div>
+   <p className="text-sm">{t.vetHelp}</p>
    <label>{t.username}<input name="username" required value="vet" readOnly autoComplete="off"/></label>
    <label>{t.password}<input name="password" type="password" minLength={passwordMinimum} maxLength={128} required autoComplete="new-password"/></label>
    <p>{t.minimum}</p>
    <label>{t.current}<input name="currentPassword" type="password" required autoComplete="current-password"/></label>
    <button disabled={busy}>{t.save}</button>{saved&&<p role="status">{t.done}</p>}
-  </form>}
+  </form></div>}
   <Suspense fallback={<p role="status">…</p>}><App/></Suspense>
- </>
+ </AccountContext.Provider>
 }

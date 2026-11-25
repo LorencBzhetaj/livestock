@@ -1,4 +1,4 @@
-export type IconName='home'|'animals'|'health'|'calendar'|'settings'|'arrow'|'vaccine'|'tasks'|'reports'|'backup'|'bell'|'plus'|'layers'|'user'
+export type IconName='home'|'animals'|'health'|'calendar'|'settings'|'arrow'|'vaccine'|'tasks'|'reports'|'backup'|'bell'|'plus'|'layers'|'user'|'menu'|'close'
 export function Icon({name,className=''}:{name:IconName;className?:string}){
  const paths={
  home:'M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z',
@@ -15,6 +15,8 @@ export function Icon({name,className=''}:{name:IconName;className?:string}){
  plus:'M12 8v8M8 12h8M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
  layers:'m12 3 10 5-10 5L2 8Zm-10 9 10 5 10-5M2 16l10 5 10-5',
  user:'M8 7a4 4 0 1 0 8 0 4 4 0 0 0-8 0M3 21v-3a9 9 0 0 1 18 0v3Z',
+ menu:'M4 7h16M4 12h16M4 17h16',
+ close:'M6 6l12 12M18 6 6 18',
  }
  return <svg className={className} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]}/></svg>
 }

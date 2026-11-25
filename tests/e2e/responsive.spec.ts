@@ -12,13 +12,17 @@ async function reachEveryPage(page: Page) {
   await expect(page.getByRole('heading', { name: 'Përshëndetje, fermer' })).toBeVisible()
   const bottom = page.getByRole('navigation', { name: 'Navigimi kryesor' })
   await expect(bottom.getByRole('link', { name: 'Kreu' })).toBeVisible()
-  const more = page.getByRole('navigation', { name: 'Më shumë faqe' })
   for (const [name, url] of destinations) {
-    const link = more.getByRole('link', { name })
+    const button = page.getByRole('button', { name: 'Menyja' })
+    expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    await button.click()
+    const menu = page.getByRole('dialog', { name: 'Menyja' })
+    const link = menu.getByRole('navigation', { name: 'Të gjitha faqet' }).getByRole('link', { name })
     await link.scrollIntoViewIfNeeded()
     expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44)
     await link.click()
     await expect(page).toHaveURL(url)
+    await expect(menu).toBeHidden()
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 }
@@ -39,9 +43,26 @@ test('a phone held in landscape keeps the bottom navigation instead of a clipped
   await reachEveryPage(page)
 })
 
-test('desktop keeps the full sidebar and hides the phone shortcuts', async ({ page }, info) => {
+test('the phone menu opens and closes with the keyboard and keeps the page from scrolling', async ({ page }, info) => {
+  test.skip(info.project.name === 'desktop', 'Phone layout only')
+  await page.goto('/')
+  const button = page.getByRole('button', { name: 'Menyja' })
+  await expect(button).toHaveAttribute('aria-expanded', 'false')
+  await button.click()
+  const menu = page.getByRole('dialog', { name: 'Menyja' })
+  await expect(menu).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Mbyll menynë' })).toBeFocused()
+  await expect(menu.getByRole('link', { name: 'Kreu' })).toHaveAttribute('aria-current', 'page')
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden')
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
+  await expect(button).toBeFocused()
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe('')
+})
+
+test('desktop keeps the full sidebar and hides the phone menu button', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop', 'Desktop layout only')
   await page.goto('/')
   await expect(page.getByRole('navigation', { name: 'Navigimi kryesor' }).getByRole('link', { name: 'Raporte' })).toBeVisible()
-  await expect(page.getByRole('navigation', { name: 'Më shumë faqe' })).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Menyja' })).toBeHidden()
 })

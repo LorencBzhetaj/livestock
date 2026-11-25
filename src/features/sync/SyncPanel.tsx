@@ -120,7 +120,7 @@ export default function SyncPanel({ language, settings }: { language: Language; 
     {state?t[status]:navigator.onLine?(language==='sq'?'Gati për punë':'Ready to work'):t.offline}
   </div>
 
-  return <section className="panel mt-4" aria-labelledby="sync-heading">
+  return <section className={'panel mt-4 sync-panel'+(!settings&&!state?' sync-notice':'')} aria-labelledby="sync-heading">
     <h2 id="sync-heading">{t.title}</h2>
     <p role="status">{t[status]}</p>
     <p className="text-sm">{t.photos}</p>
