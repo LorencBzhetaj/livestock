@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, expect, test } from 'vitest'
+import { liveQuery } from 'dexie'
 import { LivestockDatabase } from '../src/db/database'
 import { createRepositories } from '../src/db/repositories'
 import { acknowledge, applyPage, connectLocal, farmWrite, journal, previewLocal, resolve } from '../src/features/sync/local'
@@ -184,4 +185,27 @@ test('schema role cannot alter data outside its authorized write surface', async
     await sql.exec('SET LOCAL ROLE livestock_sync_runtime')
     await sql.exec('INSERT INTO livestock_sync.identities(id) SELECT id FROM livestock_sync.identities WHERE false')
   })).rejects.toMatchObject({code:'42501'})
+})
+
+test('a pull with nothing new does not rewrite the sync state, so the watcher does not start another sync', async () => {
+  // Regression: every empty pull rewrote syncState, the coordinator's liveQuery saw a change and synced again,
+  // looping about four times a second and keeping the status on "Syncing".
+  const db = new LivestockDatabase('quiet-' + id())
+  try {
+    const session = { farmId: id(), identityId: id(), deviceId: id(), name: 'Farm' }
+    await connectLocal(db, session, [], [], '4')
+    const seen: (string | undefined)[] = []
+    const watching = liveQuery(() => db.syncState.get('farm')).subscribe({ next: (state) => seen.push(state?.cursor) })
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(seen).toEqual(['4'])
+      for (let i = 0; i < 3; i++) await applyPage(db, session, '4', { changes: [], cursor: '4', more: false })
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(seen).toEqual(['4'])
+      const remote = animal('NEW')
+      await applyPage(db, session, '4', { changes: [{ entity: 'animals', recordId: remote.id, payload: remote, cursor: '5', version: 1 }], cursor: '5', more: false })
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(seen).toEqual(['4', '5'])
+    } finally { watching.unsubscribe() }
+  } finally { await db.delete() }
 })

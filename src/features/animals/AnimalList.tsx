@@ -7,6 +7,7 @@ import { animalStrings } from '../../i18n/animals'
 import { strings } from '../../i18n/strings'
 import { ageBands, emptyFilters, filterAnimals, localToday } from './registry'
 import { Field, speciesName, useLocalQuery } from './shared'
+import { DeleteAnimal } from './DeleteAnimal'
 
 async function readRegistry() {
   const [animals, species, groups] = await Promise.all([
@@ -19,22 +20,29 @@ export function AnimalList({ language }: { language: Language }) {
   const t = animalStrings[language]
   const result = useLocalQuery(readRegistry)
   const [filters, setFilters] = useState(emptyFilters)
+  const [showRemoved, setShowRemoved] = useState(false)
+  const readOnly = getAccess()?.role === 'VETERINARIAN'
   const location = useLocation()
   const imported = location.state?.imported as number | undefined
   const today = localToday()
   const split = useMemo(() => {
     if (!result?.data) return
     const { animals, species, groups } = result.data
+    // Deleted (archived) animals leave the list unless asked for, by the button or the Status filter.
+    const includeRemoved = showRemoved || Boolean(filters.status)
+    const removed = animals.filter((animal) => animal.status === 'archived').length
     return {
+      removed,
       visible: filterAnimals(animals, filters, today)
+        .filter((animal) => includeRemoved || animal.status !== 'archived')
         .sort((left, right) => left.earTag.localeCompare(right.earTag, language, { numeric: true })),
       breeds: [...new Set(animals.flatMap(({ breed }) => breed ? [breed] : []))]
         .sort((left, right) => left.localeCompare(right, language)),
       names: new Map(species.map((item) => [item.id, speciesName(item, language)])),
       groups,
-      total: animals.length,
+      total: includeRemoved ? animals.length : animals.length - removed,
     }
-  }, [result, filters, today, language])
+  }, [result, filters, today, language, showRemoved])
 
   const choices = (key: keyof typeof emptyFilters, label: string, options: [string, string][]) => (
     <Field label={label}>
@@ -50,7 +58,7 @@ export function AnimalList({ language }: { language: Language }) {
     <div className="registry">
       <div className="registry-heading">
         <h1>{t.registry}</h1>
-        {getAccess()?.role!=='VETERINARIAN'&&<div className="flex flex-wrap gap-2">
+        {!readOnly&&<div className="flex flex-wrap gap-2">
           <Link className="registry-action secondary" to="import">{t.csv}</Link>
           <Link className="registry-action" to="new">{t.add}</Link>
         </div>}
@@ -76,14 +84,19 @@ export function AnimalList({ language }: { language: Language }) {
           </section>
           <div className="mt-4 flex min-h-11 flex-wrap items-center justify-between gap-2">
             <p className="text-sm tabular-nums text-stone-700" role="status">{t.results} · {split.visible.length} / {split.total}</p>
-            {Object.values(filters).some(Boolean) &&
-              <button className="registry-action secondary" onClick={() => setFilters(emptyFilters)}>{t.clear}</button>}
+            <div className="flex flex-wrap gap-2">
+              {split.removed > 0 && !filters.status &&
+                <button className="registry-action secondary" aria-pressed={showRemoved} onClick={() => setShowRemoved(!showRemoved)}>
+                  {showRemoved ? t.hideRemoved : t.showRemoved + ' (' + split.removed + ')'}</button>}
+              {Object.values(filters).some(Boolean) &&
+                <button className="registry-action secondary" onClick={() => setFilters(emptyFilters)}>{t.clear}</button>}
+            </div>
           </div>
           {split.visible.length ? (
             <ul className="mt-2 divide-y divide-stone-200 overflow-hidden rounded-xl border border-stone-200 bg-white">
               {split.visible.map((animal) => (
-                <li key={animal.id}>
-                  <Link to={animal.id} className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 py-2.5 hover:bg-green-50 focus-visible:outline-offset-[-3px] sm:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_8rem]">
+                <li key={animal.id} className="animal-row">
+                  <Link to={animal.id} className="animal-row-link grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 py-2.5 hover:bg-green-50 focus-visible:outline-offset-[-3px] sm:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_8rem]">
                     <span className="min-w-0 break-words font-semibold text-pine">{animal.earTag}
                       {animal.name && <span className="ml-1 font-normal text-stone-800">{' '}{animal.name}</span>}
                     </span>
@@ -94,6 +107,10 @@ export function AnimalList({ language }: { language: Language }) {
                       {t[animal.status]}
                     </span>
                   </Link>
+                  {!readOnly && <div className="animal-row-actions">
+                    <Link to={animal.id + '/edit'} className="row-action" aria-label={t.editShort + ' ' + animal.earTag + (animal.name ? ' · ' + animal.name : '')}>{t.editShort}</Link>
+                    <DeleteAnimal animal={animal} language={language} />
+                  </div>}
                 </li>
               ))}
             </ul>
