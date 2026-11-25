@@ -102,6 +102,11 @@ test('Vet and anonymous requests cannot administer reminders or invoke the sched
   expect(store.run).not.toHaveBeenCalled()
   await fetch(url,{method:'POST',headers:{authorization:'Bearer '+'K'.repeat(43),'x-livestock-dry-run':'1'}})
   expect(store.run).toHaveBeenCalledWith(expect.any(Date),{dryRun:true})
+  // Vercel Cron uses GET with the bearer key and always performs a real run.
+  expect((await fetch(url,{headers:{authorization:'Bearer '+'J'.repeat(43)}})).status).toBe(401)
+  expect(store.run).toHaveBeenCalledTimes(1)
+  expect((await fetch(url,{headers:{authorization:'Bearer '+'K'.repeat(43)}})).status).toBe(200)
+  expect(store.run).toHaveBeenLastCalledWith(expect.any(Date),{dryRun:false})
  }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()))}
 })
 test('reminder push deduplicates and opens only the calendar in scope',async()=>{
@@ -115,3 +120,30 @@ test('reminder push deduplicates and opens only the calendar in scope',async()=>
  expect(navigate).toHaveBeenCalledWith('https://example.test/tasks')
  expect(open).not.toHaveBeenCalled()
 })
+
+test('one scheduled run reaches every enrolled Admin device without waiting for the next trigger',async()=>{
+ const pg=new PGlite()
+ try{
+  for(const file of ['server/push-schema.sql','server/sync-schema.sql','server/sync-runtime.sql','server/auth-schema.sql','server/reminder-schema.sql'])await pg.exec(await readFile(file,'utf8'))
+  const transaction:Transaction=work=>pg.transaction(async sql=>{await sql.exec('SET LOCAL ROLE livestock_sync_runtime');return work({query:(text,args)=>sql.query(text,args)})})
+  const farm=id(),identity=id(),account=id()
+  await pg.query('INSERT INTO livestock_sync.farms(id,name) VALUES($1,$2)',[farm,'Synthetic'])
+  await pg.query('INSERT INTO livestock_sync.identities(id) VALUES($1)',[identity])
+  await pg.query('INSERT INTO livestock_sync.farm_members(farm_id,identity_id) VALUES($1,$2)',[farm,identity])
+  await pg.query("INSERT INTO livestock_sync.accounts(id,farm_id,identity_id,username,role,password_hash) VALUES($1,$2,$3,'adi','ADMIN','synthetic unused')",[account,farm,identity])
+  await pg.query('INSERT INTO livestock_sync.tasks(farm_id,id,version,payload) VALUES($1,$2,1,$3)',[farm,task.id,task])
+  const deliver=vi.fn(async()=>201),store=createReminderStore(transaction,pushSecrets(randomBytes(32)),deliver)
+  for(const label of ['Phone','Desktop','Tablet']){
+   const device=id()
+   await pg.query("INSERT INTO livestock_sync.devices(id,farm_id,identity_id,label,token_digest,account_id,expires_at) VALUES($1,$2,$3,$4,$5,$6,now()+interval '30 days')",[device,farm,identity,label,'unused-'+label,account])
+   const key=createECDH('prime256v1');key.generateKeys()
+   await store.enroll({accountId:account,farmId:farm,identityId:identity,deviceId:device,username:'adi',role:'ADMIN',name:'Synthetic',expiresAt:new Date(Date.now()+86400000).toISOString()},
+    {endpoint:'https://fcm.googleapis.com/fcm/send/synthetic-'+label,keys:{p256dh:key.getPublicKey().toString('base64url'),auth:randomBytes(16).toString('base64url')}},prefs)
+  }
+  expect(await store.run(new Date('2026-11-21T09:00:00Z'))).toMatchObject({checked:3,eligible:3,accepted:3})
+  expect(deliver).toHaveBeenCalledTimes(3)
+  // A repeated trigger on the same local day sends nothing new.
+  await store.run(new Date('2026-11-21T09:15:00Z'))
+  expect(deliver).toHaveBeenCalledTimes(3)
+ }finally{await pg.close()}
+},30000)

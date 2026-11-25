@@ -149,3 +149,11 @@ test('offline Vet denies repository and direct table writes, export, and reads a
   expect(await repo.animals.list()).toHaveLength(1)
  }finally{setAccess(account,db.name);await db.delete()}
 })
+
+test('failed guesses from one address cannot lock the owner out from another address',async()=>{
+ for(let i=0;i<5;i++) expect((await auth.execute({action:'login',username:'adi',password:'wrong guess',remember:false,label:'Other'},undefined,'attacker')).status).toBe(401)
+ expect((await auth.execute({action:'login',username:'adi',password:'wrong guess',remember:false,label:'Other'},undefined,'attacker')).status).toBe(429)
+ const owner=await auth.execute({action:'login',username:'adi',password,remember:false,label:'Owner phone'},undefined,'owner-network')
+ expect(owner.status).toBe(200)
+ expect((owner.value as AuthSession).role).toBe('ADMIN')
+},30000)

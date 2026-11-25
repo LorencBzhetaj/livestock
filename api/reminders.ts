@@ -8,6 +8,7 @@ import {pushSecrets,tokenSchema,enrolledSubscription} from '../server/pushSecuri
 import {createReminderStore} from '../server/reminderStore.js'
 import {reminderPreferences} from '../server/reminderSchedule.js'
 import {deliverPush} from '../server/deliverPush.js'
+import {allowedOrigin,runtimeDatabase} from '../server/target.js'
 
 export const reminderRequest=z.discriminatedUnion('action',[
  z.strictObject({action:z.literal('enroll'),subscription:enrolledSubscription,preferences:reminderPreferences}),
@@ -21,7 +22,8 @@ export function createReminderHandler(options:{
  return async(req:IncomingMessage,res:ServerResponse)=>{
   try{
    const bearer=req.headers.authorization?.slice(7)
-   if(req.method==='POST'&&req.headers.authorization?.startsWith('Bearer ')&&tokenSchema.safeParse(bearer).success&&bearer&&bearer.length===options.cronKey.length&&timingSafeEqual(Buffer.from(bearer),Buffer.from(options.cronKey))){
+   // Vercel Cron calls GET with the same bearer key; other schedulers use POST.
+   if((req.method==='POST'||req.method==='GET')&&req.headers.authorization?.startsWith('Bearer ')&&tokenSchema.safeParse(bearer).success&&bearer&&bearer.length===options.cronKey.length&&timingSafeEqual(Buffer.from(bearer),Buffer.from(options.cronKey))){
     const mode=req.headers['x-livestock-dry-run']
     if(mode!==undefined&&mode!=='0'&&mode!=='1')return reply(res,400,{error:'invalid'})
     const result=await options.store.run(new Date(),{dryRun:mode==='1'})
@@ -46,14 +48,15 @@ export function createReminderHandler(options:{
  }
 }
 function configure(env:NodeJS.ProcessEnv){
- if(env.VERCEL_ENV!=='preview'||env.REMINDERS_ENABLED!=='1'||env.AUTH_ENABLED!=='1'||!env.SYNC_DATABASE_URL)return
+ const target=runtimeDatabase(env),origin=allowedOrigin(env)
+ if(env.REMINDERS_ENABLED!=='1'||env.AUTH_ENABLED!=='1'||!target||!origin)return
  try{
-  const url=new URL(env.SYNC_DATABASE_URL),origin=env.SYNC_ALLOWED_ORIGIN
+  const url=target.url
   const targetFingerprint=createHash('sha256').update(url.hostname.replace('-pooler.','.')).digest('hex')
   if(!/^[a-f0-9]{64}$/.test(env.REMINDERS_EXPECTED_HOST_HASH??'')||targetFingerprint!==env.REMINDERS_EXPECTED_HOST_HASH)return
   const publicKey=publicPushKey(env),privateKey=tokenSchema.parse(env.PUSH_VAPID_PRIVATE_KEY),serverKey=tokenSchema.parse(env.PUSH_SERVER_KEY),cronKey=tokenSchema.parse(env.REMINDERS_CRON_KEY),subject=env.PUSH_VAPID_SUBJECT
   const validContact=subject&&(subject.startsWith('mailto:')?z.email().safeParse(subject.slice(7)).success:subject.startsWith('https://')&&URL.canParse(subject))
-  if(url.pathname!=='/livestock_m8_preview'||url.username!=='livestock_sync_runtime'||url.searchParams.get('sslmode')!=='verify-full'||!origin?.startsWith('https://')||new URL(origin).origin!==origin||!publicKey||!validContact||!subject)return
+  if(!publicKey||!validContact||!subject)return
   const transaction=postgresTransactions(url.href)
   return createReminderHandler({origin,publicKey,cronKey,targetFingerprint,backgroundReady:env.REMINDERS_SCHEDULER_READY==='1',auth:createAuthStore(transaction),store:createReminderStore(transaction,pushSecrets(Buffer.from(serverKey,'base64url')),(subscription,message)=>deliverPush(subscription,message,{subject,publicKey,privateKey}))})
  }catch{return}

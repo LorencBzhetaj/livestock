@@ -22,7 +22,7 @@ export function createReminderStore(transaction:Transaction,secrets:Secrets,deli
  JOIN livestock_sync.farm_members m ON m.farm_id=d.farm_id AND m.identity_id=d.identity_id
  WHERE d.revoked_at IS NULL AND d.expires_at>now() AND a.enabled AND a.role='ADMIN' AND p.expires_at>now()`
  async function send(binding:Binding,id:string,language:'sq'|'en',kind:'test'|'reminder'){
-  const reserved=await push.operate({kind:'test',deviceId:binding.push_device_id,requestId:id,language,endpointHash:binding.endpoint_hash})
+  const reserved=await push.operate({kind:'test',deviceId:binding.push_device_id,requestId:id,language,endpointHash:binding.endpoint_hash,scheduled:kind==='reminder'})
   if(reserved.kind!=='send')return reserved.kind
   // Recheck revocation after reserving and before network I/O.
   const valid=await transaction(async sql=>(await sql.query(active+' AND b.sync_device_id=$1',[binding.sync_device_id])).rows.length>0)

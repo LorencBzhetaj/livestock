@@ -3,6 +3,7 @@ import { requestSchema } from '../src/features/sync/protocol.js'
 import { postgresTransactions } from '../server/pushDatabase.js'
 import { createSyncStore } from '../server/syncStore.js'
 import { reply } from '../server/push.js'
+import { allowedOrigin, runtimeDatabase } from '../server/target.js'
 
 const cookieName = '__Host-livestock-sync'
 const maxBody = 3 * 1024 * 1024
@@ -69,14 +70,9 @@ export function createSyncHandler(store: ReturnType<typeof createSyncStore>, ori
 }
 
 function configure(env: NodeJS.ProcessEnv) {
-  if (env.SYNC_ENABLED !== '1' || env.VERCEL_ENV !== 'preview' || !env.SYNC_DATABASE_URL || !env.SYNC_ALLOWED_ORIGIN) return
-  try {
-    const db = new URL(env.SYNC_DATABASE_URL)
-    const origin = new URL(env.SYNC_ALLOWED_ORIGIN)
-    if (origin.protocol !== 'https:' || origin.origin !== env.SYNC_ALLOWED_ORIGIN || db.protocol !== 'postgresql:'
-      || db.searchParams.get('sslmode') !== 'verify-full' || db.username !== 'livestock_sync_runtime') return
-    return createSyncHandler(createSyncStore(postgresTransactions(db.href), env.AUTH_ENABLED === '1'), origin.origin)
-  } catch { return undefined }
+  const target = runtimeDatabase(env), origin = allowedOrigin(env)
+  if (env.SYNC_ENABLED !== '1' || !target || !origin) return
+  return createSyncHandler(createSyncStore(postgresTransactions(target.url.href), env.AUTH_ENABLED === '1'), origin)
 }
 
 const enabled = configure(process.env)
