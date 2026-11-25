@@ -66,7 +66,7 @@ A reviewed Production migration should add timeouts, a history row, and pre-chec
 
 ## 4. Backup and recovery
 - **VERIFIED by tests:** backup format v1 and IndexedDB v5, checksum, photos, preview without writes, atomic restore with rollback, and size limit (`tests/backup*.test.ts`, `tests/e2e/backup.spec.ts`). The 1 skipped unit test is the opt-in stress test (`LIVESTOCK_BACKUP_STRESS=1`).
-- **NOT VERIFIED:** Neon snapshot restore. A safe rehearsal restores the snapshot to a *new* Neon branch, compares row counts and schema, then deletes that branch. Never restore onto the Production branch.
+- **NOT VERIFIED:** Neon snapshot restore. A safe rehearsal restores the snapshot to a *new* Neon branch, compares row counts and schema, then deletes that branch. Never restore onto the Production branch. *(Update 25 Nov 2026: verified in step D and the rehearsal branch deleted; see [RECOVERY.md](RECOVERY.md).)*
 
 ## 5. Authentication
 **VERIFIED** in code and tests:

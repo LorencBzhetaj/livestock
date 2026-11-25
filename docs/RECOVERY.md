@@ -13,7 +13,7 @@
 | Point-in-time restore window | 21,600 s = **6 hours** |
 
 **Rehearsal (D) passed.**
-- The snapshot was restored, without finalizing, to the new branch `livestock-restore-rehearsal-20261125` (`br-nameless-scene-ba2mojdz`, endpoint `ep-shy-violet-baj9zg7s`).
+- The snapshot was restored, without finalizing, to the new branch `livestock-restore-rehearsal-20261125` (`br-nameless-scene-ba2mojdz`, endpoint `ep-shy-violet-baj9zg7s`; deleted after E).
 - The production branch stayed the default branch and was not changed.
 - The restored copy is identical to Production in schema, constraints, indexes, roles, memberships, ACLs, row counts and size.
 - The migration was then applied **to the copy only**. It took 227 ms and created 21 tables and 35 indexes.
@@ -21,7 +21,9 @@
 - Memberships are unchanged apart from the automatic ADMIN that Postgres gives a role's creator.
 - A second run is refused.
 
-The rehearsal branch is kept for comparison until E is done.
+After E was applied and verified identical to the rehearsal, the rehearsal branch was deleted on 25 Nov 2026. The project now has two branches, `production` (default) and `livestock-m8-preview`. Snapshot `snap-wild-rice-bacqz7uz` was taken from the production branch and is unaffected.
+
+**Still open:** there are no automatic snapshots for the production branch. Only the manual snapshot and the 6-hour point-in-time window exist. Turning on a schedule is a Neon project setting and needs approval.
 
 ## Verify the snapshot (read-only, before the migration)
 1. In the Neon console, open the project behind `livestock-liart.vercel.app` and its Production branch. Note the project ID, branch ID and database name. Use that database name as `expected_database` and `SYNC_DATABASE_NAME`.
