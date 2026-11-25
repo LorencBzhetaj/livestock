@@ -1,4 +1,5 @@
 import { getAccess,authRequired } from '../features/auth/access'
+import { useAccount } from '../features/auth/account'
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react'
 import { liveQuery } from 'dexie'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
@@ -30,6 +31,7 @@ function subscribeOnline(onChange: () => void) {
 
 export function App() {
   const readOnly = getAccess()?.role === 'VETERINARIAN'
+  const account = useAccount()
   const location = useLocation()
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine)
   const [local, setLocal] = useState<{ language: Language; demo: boolean }>()
@@ -86,7 +88,7 @@ export function App() {
       {(readFailed || actionFailed) && <p role="alert" className="mb-5 text-red-800">{t.error}</p>}
       {pwa === 'waiting' && <p className="panel mb-5" role="status">{pwaStrings[language].waiting}</p>}
       {peerRestore && <p className="panel mb-5" role="status">{pwaStrings[language].peerRestore}</p>}
-      <Suspense fallback={null}><SyncPanel language={language} settings={location.pathname === '/settings'} /></Suspense>
+      {location.pathname !== '/settings' && <Suspense fallback={null}><SyncPanel language={language} settings={false} /></Suspense>}
       <fieldset disabled={readOnly && /\/(new|edit|import|batch|amend)(\/|$)/.test(location.pathname)} className="m-0 min-w-0 border-0 p-0">
       <Routes>
         <Route path="/" element={
@@ -108,6 +110,13 @@ export function App() {
           <>
             <h1>{t.settings}</h1>
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              {account?.role === 'ADMIN' && <section className="panel sm:col-span-2" aria-labelledby="accounts-heading">
+                <h2 id="accounts-heading">{language === 'sq' ? 'Llogaritë' : 'Accounts'}</h2>
+                <p className="mt-2">{language === 'sq'
+                  ? 'Krijo llogarinë e veterinerit ose ndrysho fjalëkalimin e saj. Veterineri sheh të dhënat, por nuk mund t\'i ndryshojë.'
+                  : 'Create the veterinarian account or change its password. The veterinarian can view records but cannot change them.'}</p>
+                <button onClick={account.openVet}>{language === 'sq' ? 'Llogaria e veterinerit' : 'Veterinarian account'}</button>
+              </section>}
               <section className="panel sm:col-span-2">
                 <label htmlFor="language" className="block font-semibold">{t.language}</label>
                 <select id="language" value={language} disabled={!local || pending}
@@ -124,7 +133,7 @@ export function App() {
                 <p className="mt-2" id="demo-help">{t.demoHelp}</p>
                 {local?.demo
                   ? <p role="status" className="mt-4 font-medium">{t.demoAdded}</p>
-                  : <button aria-describedby="demo-help" disabled={!local || pending}
+                  : <button className="button-secondary" aria-describedby="demo-help" disabled={!local || pending}
                       onClick={() => void perform(() => seedDemo(database))}>{t.addDemo}</button>}
               </section>
               <section className="panel">
@@ -132,7 +141,7 @@ export function App() {
                 <p className="mt-2">{getAccess()?(language==='sq'?'Puno edhe pa internet. Këtu mund të kontrollosh gjendjen e të dhënave të tua.':'Keep working offline. Check the status of your records here.'):t.localHelp}</p>
                 <p className="mt-2">{t.storageWarning}</p>
                 {pwa !== 'waiting' && <p className="mt-2 text-sm" role="status">{pwaStrings[language][pwa]}</p>}
-                <button disabled={pending || persistent === true}
+                <button className="button-secondary" disabled={pending || persistent === true}
                   onClick={() => void perform(async () => setPersistent(await navigator.storage?.persist?.() ?? false))}>
                   {t.requestStorage}
                 </button>
@@ -140,6 +149,7 @@ export function App() {
                   <p role="status" className="mt-3">{persistent ? t.storageGranted : t.storageUnavailable}</p>}
               </section>
             </div>
+            <Suspense fallback={null}><SyncPanel language={language} settings /></Suspense>
             <Suspense fallback={<p role="status">{t.loading}</p>}>
               <NotificationSettings language={language} online={online} />
             </Suspense>

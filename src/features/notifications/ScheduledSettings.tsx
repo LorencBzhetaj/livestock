@@ -57,11 +57,11 @@ export default function ScheduledSettings({language,online}:{language:Language;o
     await repositories.settings.save({key:preferenceKey,value:prefs,updatedAt:now()})
     setState(stateSchema.parse(await request()));setNotice(text.saved)
    })}>{text.enable}</button>
-   <button disabled={busy||!online||!state?.enrolled} onClick={()=>void perform(async()=>{
+   <button className="button-secondary" disabled={busy||!online||!state?.enrolled} onClick={()=>void perform(async()=>{
     await request({action:'revoke'});setState(current=>current&&{...current,enrolled:false})
     const sw=await navigator.serviceWorker.getRegistration();await(await sw?.pushManager.getSubscription())?.unsubscribe();testId.current=undefined;setNotice(text.saved)
    })}>{text.disable}</button>
-   <button disabled={busy||!online||!state?.enrolled} onClick={()=>void perform(async()=>{
+   <button className="button-secondary" disabled={busy||!online||!state?.enrolled} onClick={()=>void perform(async()=>{
     testId.current??=crypto.randomUUID()
     const result=await request({action:'test',requestId:testId.current})
     setNotice(result.status==='providerAccepted'?text.accepted:text.unknown)
