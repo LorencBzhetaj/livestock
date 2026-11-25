@@ -2,7 +2,9 @@ import { z } from 'zod'
 export const roles = z.enum(['ADMIN', 'VETERINARIAN'])
 export type Role = z.infer<typeof roles>
 export const username = z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,40}$/)
-export const password = z.string().min(12).max(128)
+// New Admin and Vet passwords. Login keeps accepting any stored password (1-128).
+export const passwordMinimum = 8
+export const password = z.string().min(passwordMinimum).max(128)
 export const authSession = z.strictObject({
  farmId: z.uuid(), identityId: z.uuid(), deviceId: z.uuid(), name: z.string(),
  accountId: z.uuid(), username, role: roles, expiresAt: z.iso.datetime(),
