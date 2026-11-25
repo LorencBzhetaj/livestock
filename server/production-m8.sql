@@ -1,7 +1,9 @@
 -- LivestockOS M8 Production migration: accounts, multi-device sync and reminders.
 -- Additive only. It creates the livestock_sync schema and the NOLOGIN runtime role,
--- and grants that role access to the four existing M7B push tables. No existing
--- table, row or role is dropped, truncated, altered or deleted.
+-- and has the M7B table owner grant that role access to the four existing push tables
+-- (plus REFERENCES on livestock_push_devices to the migration role, for one foreign key).
+-- No existing table, row or role is dropped, truncated, altered or deleted; the only
+-- membership change is temporary and is revoked inside the same transaction.
 --
 -- Run as the database owner role on the Production branch with psql, in ONE session:
 --   psql "<owner connection, sslmode=verify-full, NOT pooled>" -v ON_ERROR_STOP=1 \
@@ -24,7 +26,7 @@ SELECT set_config('livestock.expected_database', :'expected_database', true);
 
 -- Preconditions: right database, nothing from M8 yet, all four M7B tables present.
 DO $$
-DECLARE missing text;
+DECLARE missing text; m7b_owner text;
 BEGIN
   IF current_database() <> current_setting('livestock.expected_database') THEN
     RAISE EXCEPTION 'Connected to %, expected %', current_database(), current_setting('livestock.expected_database');
@@ -43,6 +45,22 @@ BEGIN
   IF missing IS NOT NULL THEN
     RAISE EXCEPTION 'Expected M7B tables are missing: %', missing;
   END IF;
+  -- On Neon the M7B tables belong to a separate migrator role. The owner role holds ADMIN
+  -- on it without INHERIT or SET, so it may only act as that role through a membership it grants
+  -- itself for this transaction and revokes again below.
+  SELECT min(pg_get_userbyid(relowner)) INTO m7b_owner FROM pg_class
+   WHERE oid IN ('public.livestock_push_devices'::regclass, 'public.livestock_push_grants'::regclass,
+     'public.livestock_push_quota'::regclass, 'public.livestock_push_receipts'::regclass);
+  IF (SELECT count(DISTINCT relowner) FROM pg_class WHERE oid IN ('public.livestock_push_devices'::regclass,
+     'public.livestock_push_grants'::regclass, 'public.livestock_push_quota'::regclass, 'public.livestock_push_receipts'::regclass)) <> 1 THEN
+    RAISE EXCEPTION 'The four M7B tables do not share one owner. Stop and inspect.';
+  END IF;
+  IF m7b_owner <> current_user AND NOT EXISTS (SELECT 1 FROM pg_auth_members
+     WHERE roleid = m7b_owner::regrole AND member = current_user::regrole AND admin_option) THEN
+    RAISE EXCEPTION 'Role % must own the M7B tables or hold ADMIN on their owner %', current_user, m7b_owner;
+  END IF;
+  PERFORM set_config('livestock.m7b_owner', m7b_owner, true);
+  PERFORM set_config('livestock.migration_role', current_user, true);
 END $$;
 
 -- sync-schema.sql
@@ -160,13 +178,6 @@ CREATE TABLE login_limits (
  scope text PRIMARY KEY, attempts integer NOT NULL DEFAULT 0, blocked_until timestamptz NOT NULL
 );
 
--- reminder-schema.sql (table)
-CREATE TABLE reminder_devices (
- sync_device_id uuid PRIMARY KEY REFERENCES devices(id),
- push_device_id uuid NOT NULL UNIQUE REFERENCES public.livestock_push_devices(id) ON DELETE CASCADE,
- preferences jsonb NOT NULL
-);
-
 -- Least-privilege runtime role. It cannot log in until the owner sets a password privately
 -- (Neon console or ALTER ROLE ... LOGIN PASSWORD in a separate, unlogged session).
 CREATE ROLE livestock_sync_runtime NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT;
@@ -189,10 +200,34 @@ GRANT SELECT ON owner_setup TO livestock_sync_runtime;
 GRANT UPDATE(used_at) ON owner_setup TO livestock_sync_runtime;
 GRANT SELECT, INSERT, UPDATE, DELETE ON login_limits TO livestock_sync_runtime;
 GRANT INSERT ON identities, farm_members TO livestock_sync_runtime;
--- reminder-schema.sql: the only change touching pre-existing (M7B) objects is these grants.
+-- reminder-schema.sql: the only changes touching pre-existing (M7B) objects are these grants,
+-- issued by the M7B table owner. The temporary membership is revoked before the block ends.
+DO $$
+DECLARE owner text := current_setting('livestock.m7b_owner'); me text := current_setting('livestock.migration_role');
+BEGIN
+  IF owner <> me THEN
+    EXECUTE format('GRANT %I TO %I WITH INHERIT FALSE, SET TRUE GRANTED BY %I', owner, me, me);
+    EXECUTE format('SET LOCAL ROLE %I', owner);
+  END IF;
+  EXECUTE format('GRANT REFERENCES ON public.livestock_push_devices TO %I', me);
+  GRANT SELECT,INSERT,UPDATE,DELETE ON public.livestock_push_devices, public.livestock_push_receipts, public.livestock_push_quota TO livestock_sync_runtime;
+  GRANT SELECT,DELETE ON public.livestock_push_grants TO livestock_sync_runtime;
+  IF owner <> me THEN
+    EXECUTE format('SET LOCAL ROLE %I', me);
+    EXECUTE format('REVOKE %I FROM %I GRANTED BY %I', owner, me, me);
+  END IF;
+  IF current_user <> me OR EXISTS (SELECT 1 FROM pg_auth_members
+     WHERE roleid = owner::regrole AND member = me::regrole AND grantor = me::regrole) THEN
+    RAISE EXCEPTION 'Temporary M7B membership was not removed';
+  END IF;
+END $$;
+SET LOCAL search_path = livestock_sync, pg_catalog;
+CREATE TABLE reminder_devices (
+ sync_device_id uuid PRIMARY KEY REFERENCES devices(id),
+ push_device_id uuid NOT NULL UNIQUE REFERENCES public.livestock_push_devices(id) ON DELETE CASCADE,
+ preferences jsonb NOT NULL
+);
 GRANT SELECT,INSERT,UPDATE,DELETE ON reminder_devices TO livestock_sync_runtime;
-GRANT SELECT,INSERT,UPDATE,DELETE ON public.livestock_push_devices, public.livestock_push_receipts, public.livestock_push_quota TO livestock_sync_runtime;
-GRANT SELECT,DELETE ON public.livestock_push_grants TO livestock_sync_runtime;
 
 INSERT INTO migrations(version) VALUES ('2026-11-25-m8-production');
 COMMIT;
