@@ -1,4 +1,5 @@
 {
+  "regions": ["fra1"],
   "git": { "deploymentEnabled": { "main": false, "codex/m7a-web-push": false, "codex/m7b-secure-push": false, "codex/m8-multi-device-sync": false } },
   "rewrites": [{ "source": "/((?!api/|assets/|.*\\.).*)", "destination": "/index.html" }]
 }

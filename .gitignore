@@ -56,3 +56,5 @@ farm-records/
 !public/icon-512.png
 *.sync-grant
 *.setup-code
+.vercel
+.env*
