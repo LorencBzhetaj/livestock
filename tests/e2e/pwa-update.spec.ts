@@ -77,8 +77,8 @@ test('installs the app shell and waits for all tabs to close before applying a s
     })).toBe(true)
     await context.setOffline(true)
     await reopened.reload()
-    await expect(reopened.getByRole('link', { name: /SYNTHETIC-DRAFT/ })).toBeVisible()
-    await expect(reopened.getByRole('link', { name: /DEMO-003/ })).toBeVisible()
+    await expect(reopened.getByRole('link', { name: /^SYNTHETIC-DRAFT/ })).toBeVisible()
+    await expect(reopened.getByRole('link', { name: /^DEMO-003/ })).toBeVisible()
     await reopened.close()
   } finally {
     server.closeAllConnections()

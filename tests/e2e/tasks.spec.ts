@@ -85,6 +85,8 @@ test('shows live counts for 200 animals and creates one confirmed reminder from 
   await page.getByLabel('CSV file').setInputFiles({ name: 'herd.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) })
   await page.getByRole('button', { name: 'Confirm import' }).click()
   await expect(page.getByText('Animals imported · 200')).toBeVisible()
+  // TEST-1 is imported as archived, and deleted (archived) animals are hidden until asked for.
+  await page.getByRole('button', { name: 'Show deleted (20)' }).click()
   await page.getByRole('link', { name: /^TEST-1\b/ }).click()
   await expect(page.getByRole('heading', { name: 'TEST-1', exact: true })).toBeVisible()
   const profile = page.url()
