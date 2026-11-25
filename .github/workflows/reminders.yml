@@ -1,7 +1,9 @@
 name: Farm reminder scheduler
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    # Off the start of the hour, where GitHub delays or drops the most scheduled runs.
+    # Best-effort backup only; see docs/SCHEDULER.md for the primary trigger.
+    - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
     inputs:
       dry_run:

@@ -95,8 +95,9 @@ export function createPushStore(transaction: Transaction, clock?: () => number) 
         'SELECT language,outcome FROM livestock_push_receipts WHERE device_id=$1 AND request_id=$2', [device.id, input.requestId],
       )).rows[0]
       if (receipt) return receipt.language === input.language ? { kind: receipt.outcome } : { kind: 'conflict' }
-      if (await limited(sql, 'send-minute:' + device.principal_id, minute, 1) ||
-          await limited(sql, 'send-day:' + device.principal_id, Math.floor(minute / 1440) * 1440, 5)) return { kind: 'limited' }
+      // The daily digest is already limited to one receipt per device and day. Test sends keep the per-person limits.
+      if (!input.scheduled && (await limited(sql, 'send-minute:' + device.principal_id, minute, 1) ||
+          await limited(sql, 'send-day:' + device.principal_id, Math.floor(minute / 1440) * 1440, 5))) return { kind: 'limited' }
       await sql.query(
         `INSERT INTO livestock_push_receipts (device_id,request_id,language,outcome,created_at)
          VALUES ($1,$2,$3,'serverAccepted',$4)`, [device.id, input.requestId, input.language, time],
@@ -116,7 +117,7 @@ export type PushStore = ReturnType<typeof createPushStore>
 type Operation =
   | { kind: 'invalid' }
   | { kind: 'revoke'; deviceId?: string }
-  | { kind: 'test'; deviceId?: string; requestId: string; language: 'sq' | 'en'; endpointHash: string }
+  | { kind: 'test'; deviceId?: string; requestId: string; language: 'sq' | 'en'; endpointHash: string; scheduled?: boolean }
   | { kind: 'enroll'; deviceId?: string; grant: string; requestId: string; payloadHash: string;
       endpointHash: string; expires: number; seal(id: string): string }
 

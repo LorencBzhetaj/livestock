@@ -3,6 +3,7 @@ import {authRequest} from '../src/features/auth/protocol.js'
 import {createAuthStore,readCookie} from '../server/authStore.js'
 import {postgresTransactions} from '../server/pushDatabase.js'
 import {reply} from '../server/push.js'
+import {allowedOrigin,runtimeDatabase} from '../server/target.js'
 
 export function createAuthHandler(store:ReturnType<typeof createAuthStore>,origin:string) {
  return async(req:IncomingMessage,res:ServerResponse)=>{
@@ -27,14 +28,9 @@ export function createAuthHandler(store:ReturnType<typeof createAuthStore>,origi
  }
 }
 function configure(){
- const e=process.env
- if(e.AUTH_ENABLED!=='1'||e.VERCEL_ENV!=='preview'||!e.SYNC_DATABASE_URL||!e.SYNC_ALLOWED_ORIGIN)return
- try{
-  const url=new URL(e.SYNC_DATABASE_URL),origin=new URL(e.SYNC_ALLOWED_ORIGIN)
-  if(url.protocol!=='postgresql:'||url.username!=='livestock_sync_runtime'||url.searchParams.get('sslmode')!=='verify-full'||
-   origin.protocol!=='https:'||origin.origin!==e.SYNC_ALLOWED_ORIGIN)return
-  return createAuthHandler(createAuthStore(postgresTransactions(url.href)),origin.origin)
- }catch{return}
+ const e=process.env,target=runtimeDatabase(e),origin=allowedOrigin(e)
+ if(e.AUTH_ENABLED!=='1'||!target||!origin)return
+ return createAuthHandler(createAuthStore(postgresTransactions(target.url.href)),origin)
 }
 const handler=configure()
 export default function auth(req:IncomingMessage,res:ServerResponse){return handler?handler(req,res):reply(res,503,{error:'unavailable'})}

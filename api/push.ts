@@ -7,6 +7,7 @@ import { createPushStore } from '../server/pushStore.js'
 import { deliverPush } from '../server/deliverPush.js'
 import { createAuthStore, readCookie } from '../server/authStore.js'
 import { pushSecrets, tokenSchema } from '../server/pushSecurity.js'
+import { runtimeDatabase } from '../server/target.js'
 
 function configure(env: NodeJS.ProcessEnv) {
   if (env.PUSH_DURABLE_TEST !== '1' || env.VERCEL_ENV === 'production') return
@@ -31,8 +32,8 @@ function configure(env: NodeJS.ProcessEnv) {
 
 const durable = configure(process.env)
 
-const accountStore = process.env.AUTH_ENABLED === '1' && process.env.SYNC_DATABASE_URL
-  ? createAuthStore(postgresTransactions(process.env.SYNC_DATABASE_URL)) : undefined
+const accountTarget = process.env.AUTH_ENABLED === '1' ? runtimeDatabase(process.env) : undefined
+const accountStore = accountTarget ? createAuthStore(postgresTransactions(accountTarget.url.href)) : undefined
 
 export default async function handler(request: IncomingMessage, response: ServerResponse) {
   if (accountStore && request.method === 'POST') {

@@ -22,10 +22,10 @@ Branch `codex/production-readiness`, based on `main` at `1982897`. Labels: **VER
 ### High
 | # | Finding | Status |
 |---|---|---|
-| H1 | `api/auth.ts:31`, `api/sync.ts:72` and `api/reminders.ts:49` start only when `VERCEL_ENV==='preview'`. `api/push.ts:12` excludes production. `api/reminders.ts:56` also pins the database path to `/livestock_m8_preview`. Production cannot serve M8 without a reviewed code change. That change was **not** made, because a guessed Production configuration would be unsafe. | VERIFIED |
+| H1 | Every endpoint started only on `VERCEL_ENV==="preview"`, and reminders were pinned to `/livestock_m8_preview`. **Update:** one shared check, `server/target.ts`, now governs all endpoints. Preview stays pinned to its database. Production requires `LIVESTOCK_PRODUCTION=1`, a declared `SYNC_DATABASE_NAME` matching the URL, the runtime role and `verify-full`. It is inert until the variables are approved. Test: `tests/target.test.ts`. | FIXED (inert) |
 | H2 | The live Production deployment (`livestock-liart.vercel.app`) is a pre-M8 build. `GET /api/push` returns `{"publicKey":null,"testEnabled":false}`, and `/api/sync`, `/api/auth` and `/api/reminders` return 404. `vercel.json` disables Git deployments for `main`, so a release needs a manual, approved deploy. | VERIFIED |
-| H3 | The scheduler is unreliable. Scheduled delivery is enabled: since `1982897` the job runs instead of being skipped. GitHub ran only **5 scheduled runs between 23 Nov 00:19 and 24 Nov 15:33 UTC**, against about 160 expected for `*/15`, with gaps of 7–12 hours. A day's digest is sent on the first run after `reminderTime`, so a day with no run before local midnight gets no reminder. | VERIFIED |
-| H4 | The workflow is pinned to the Preview origin and the `m8-preview-notifications` environment (correct isolation). No Production scheduler exists. | VERIFIED |
+| H3 | The scheduler was unreliable: 5 scheduled runs in about 40 hours. **Diagnosis:** the cause is GitHub's best-effort scheduler. Only 12 runs exist in total, skipped runs included, and none were cancelled. **Update:** the cron moved off the start of the hour; Vercel Cron (GET) is now supported; an architecture is proposed in [SCHEDULER.md](SCHEDULER.md). A dependable trigger still needs your choice. | BLOCKED on decision |
+| H4 | The workflow is pinned to the Preview origin and its environment (correct isolation). There is no Production trigger yet; see SCHEDULER.md. | VERIFIED |
 
 ### Medium
 | # | Finding | Status |
@@ -33,18 +33,26 @@ Branch `codex/production-readiness`, based on `main` at `1982897`. Labels: **VER
 | M1 | Login lockout denial of service. The username `adi` is public, and 5 requests per 15 minutes from anywhere locked out the owner. 60 requests from anywhere blocked all logins. The limits are now 5 per username+address, 50 per username, 20 per address and 300 globally. scrypt (N=2^17) keeps the wider limits safe. Regression test: `tests/auth.test.ts` (fails on the old code, passes now). | FIXED |
 | M2 | Phones had no route to the Tasks list or Reports. These were desktop-only sidebar items, Settings did not link them, and the Vet has no Settings. A scrollable row of 44 px shortcuts now appears under the header on phones. Test: `tests/e2e/responsive.spec.ts`. | FIXED |
 | M3 | Phones in landscape (844×390) showed the desktop sidebar with only about 3 of 9 items visible in a tiny scroll area. Short landscape screens now use the bottom navigation. Test: `responsive.spec.ts`. | FIXED |
-| M4 | An Admin with several devices gets reminders 15 minutes apart. The per-identity limit of 1 send per minute applies across devices, so each extra device waits for the next run. The 5-per-day limit is shared with test sends. | VERIFIED, not changed |
+| M4 | Each extra Admin device waited for the next trigger. Scheduled digests now skip the per-person test-send limits; the daily digest receipt still dedupes. Test: `tests/reminders.test.ts`. | FIXED |
 
 ### Low
 | # | Finding | Status |
 |---|---|---|
 | L1 | The Veterinaria/Vaksinimet view links were 21 px tall and are now 44 px. | FIXED |
-| L2 | `api/push.ts:34` builds an account store from `SYNC_DATABASE_URL` without the role and `sslmode` checks used elsewhere. | VERIFIED, not changed |
+| L2 | `api/push.ts` built an account store without role or `sslmode` checks. It now uses `server/target.ts`. | FIXED |
 | L3 | Pending tasks of archived animals still count toward the daily digest (`server/reminderSchedule.ts`). | VERIFIED, not changed |
 | L4 | `npm audit` shows 4 moderate advisories (minimatch/glob through `vite-plugin-pwa` → `workbox-build`). They are build-time only. The production dependency audit is clean. The only fix offered is a breaking downgrade. | VERIFIED |
 | L5 | The CSS is desktop-first with `max-width` overrides layered over two style generations. It renders correctly, so no rewrite was made. | VERIFIED |
 
 ## 3. Database migration review
+**Update (25 Nov):** a complete additive migration is now in [server/production-m8.sql](../server/production-m8.sql) (SHA-256 `74521082ca3b860c1bc4e2100351fb3b76423156faeef320e9bdff9f9ba4b3ec`, computed on the LF file in git). It adds:
+- checks that stop on the wrong database, a partial schema, an existing role or missing M7B tables;
+- `lock_timeout` 5 s and `statement_timeout` 60 s;
+- one transaction with a history row.
+
+`tests/production-migration.test.ts` checks that it yields exactly the Preview columns, constraints, indexes, role attributes and grants, refuses a second run and leaves M7B rows untouched. The originally referenced file `production-m8-reviewed.sql` was never found. The release order is in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
+
+Original review of the existing files:
 
 **BLOCKED.** The file under review does not exist. What the existing SQL files show:
 
@@ -113,6 +121,7 @@ Checked at 390×844, 768×1024, 844×390 and 1366×800 on all 12 routes. No hori
 All checks were run locally on Windows with Chromium (desktop, and phone emulation at 390 px). **No physical iPhone or Android test was run.**
 
 ## 10. Approvals required (nothing below has been done)
+Superseded by the ordered list in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 1. **Provide** `server/production-m8-reviewed.sql` and `docs/PRODUCTION_RELEASE.md`, or approve writing a new reviewed migration.
 2. **Read-only Neon access** to confirm the project, branch, schema and snapshot.
 3. **Snapshot restore rehearsal** onto a new temporary Neon branch.

@@ -11,7 +11,7 @@ async function prepare(){
  const farm=z.uuid().parse(process.env.AUTH_SETUP_FARM_ID)
  const file=process.argv[2]
  const u=new URL(process.env.SYNC_OPERATOR_DATABASE_URL)
- if(!file||!isAbsolute(file)||!file.endsWith('.setup-code')||u.pathname!=='/livestock_m8_preview'||
+ if(!file||!isAbsolute(file)||!file.endsWith('.setup-code')||u.pathname!=='/'+(process.env.AUTH_SETUP_EXPECTED_DATABASE??'livestock_m8_preview')||
    u.protocol!=='postgresql:'||u.hostname.includes('-pooler.')||u.searchParams.get('sslmode')!=='verify-full'||
    u.hostname!==process.env.AUTH_SETUP_EXPECTED_HOST)throw Error('Private setup configuration is invalid')
  const c=new Client({connectionString:u.href,connectionTimeoutMillis:7000,statement_timeout:5000})
