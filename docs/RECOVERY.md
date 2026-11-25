@@ -1,6 +1,27 @@
 # Production database recovery (Neon)
 
-**Status: NOT VERIFIED.** This audit had no Neon access. Snapshot `snap-wild-rice-bacqz7uz`, the branch it belongs to, and the recovery window are all unconfirmed. Do not rely on the snapshot until the rehearsal below has passed.
+## Verified on 25 Nov 2026 (read-only Neon CLI and `READ ONLY` transactions)
+| Item | Finding |
+|---|---|
+| Project | `hidden-morning-02953673` (`my-first-project`), `aws-eu-central-1`, PostgreSQL 18.7 |
+| Production branch | `production` (`br-bitter-leaf-ba88ggv0`), the default branch; database `neondb`; owner `neondb_owner` |
+| Preview branch | `livestock-m8-preview` (`br-proud-wildflower-bac66v3v`). It is a separate root branch, not a child of Production. |
+| Schema | `public` only. The 4 M7B tables match `server/push-schema.sql` and hold **0 rows**. No `livestock_sync` schema or runtime role exists yet. |
+| Ownership | The M7B tables belong to `livestock_m7b_migrator`. `neondb_owner` holds ADMIN on it without INHERIT or SET, which is why the migration issues those grants as the table owner. |
+| Snapshot | `snap-wild-rice-bacqz7uz` (`livestock-pre-m8-production`). It is taken from the production branch, manual, created 24 Nov at 22:47:49 UTC, 31,916,032 bytes (equal to the current branch size). It has **no expiry**. |
+| Automatic snapshots | **None scheduled** for the production branch. |
+| Point-in-time restore window | 21,600 s = **6 hours** |
+
+**Rehearsal (D) passed.**
+- The snapshot was restored, without finalizing, to the new branch `livestock-restore-rehearsal-20261125` (`br-nameless-scene-ba2mojdz`, endpoint `ep-shy-violet-baj9zg7s`).
+- The production branch stayed the default branch and was not changed.
+- The restored copy is identical to Production in schema, constraints, indexes, roles, memberships, ACLs, row counts and size.
+- The migration was then applied **to the copy only**. It took 227 ms and created 21 tables and 35 indexes.
+- The runtime role has exactly the intended rights: no UPDATE on `changes` or `health_events`, no CREATE in the schema.
+- Memberships are unchanged apart from the automatic ADMIN that Postgres gives a role's creator.
+- A second run is refused.
+
+The rehearsal branch is kept for comparison until E is done.
 
 ## Verify the snapshot (read-only, before the migration)
 1. In the Neon console, open the project behind `livestock-liart.vercel.app` and its Production branch. Note the project ID, branch ID and database name. Use that database name as `expected_database` and `SYNC_DATABASE_NAME`.

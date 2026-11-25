@@ -89,7 +89,7 @@ test('on the Neon role layout the migration grants M7B access as the table owner
  const image=await setup.dumpDataDir('none');await setup.close()
  const pg=new PGlite({loadDataDir:image,username:'neondb_owner'})
  try{
-  const memberships=()=>pg.query(`SELECT r.rolname,m.admin_option,m.inherit_option,m.set_option,pg_get_userbyid(m.grantor) AS grantor
+  const memberships=()=>pg.query<{rolname:string}>(`SELECT r.rolname,m.admin_option,m.inherit_option,m.set_option,pg_get_userbyid(m.grantor) AS grantor
    FROM pg_auth_members m JOIN pg_roles r ON r.oid=m.roleid WHERE m.member='neondb_owner'::regrole ORDER BY 1,5`).then(r=>r.rows)
   const before=await memberships()
   expect((await pg.query<{u:string}>('SELECT current_user AS u')).rows[0].u).toBe('neondb_owner')

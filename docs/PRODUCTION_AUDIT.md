@@ -45,7 +45,7 @@ Branch `codex/production-readiness`, based on `main` at `1982897`. Labels: **VER
 | L5 | The CSS is desktop-first with `max-width` overrides layered over two style generations. It renders correctly, so no rewrite was made. | VERIFIED |
 
 ## 3. Database migration review
-**Update (25 Nov):** a complete additive migration is now in [server/production-m8.sql](../server/production-m8.sql) (SHA-256 `74521082ca3b860c1bc4e2100351fb3b76423156faeef320e9bdff9f9ba4b3ec`, computed on the LF file in git). It adds:
+**Update (25 Nov):** a complete additive migration is now in [server/production-m8.sql](../server/production-m8.sql) (SHA-256 `ce7dbaf3286975199b389a1cef10e52d4ec1ea8de3b26a2ea237c837f87084c2`, computed on the LF file in git; revised after the Neon inspection). It adds:
 - checks that stop on the wrong database, a partial schema, an existing role or missing M7B tables;
 - `lock_timeout` 5 s and `statement_timeout` 60 s;
 - one transaction with a history row.
