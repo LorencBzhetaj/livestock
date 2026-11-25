@@ -24,7 +24,7 @@ function LegacySettings({language,online}:{language:Language;online:boolean}){
   const [draft, setDraft] = useState<ReturnType<typeof notificationPreferences.parse>>()
   const stored = useLocalQuery(readPreferences)
   const preferences = draft ?? notificationPreferences.safeParse(stored?.data?.value).data ??
-    { language, reminderTime: '08:00', leadDays: 0 }
+    { language, reminderTime: '08:00', leadDays: 7 }
   const [token, setToken] = useState('')
   const [code, setCode] = useState('')
   const [lastTest, setLastTest] = useState<keyof typeof t>()

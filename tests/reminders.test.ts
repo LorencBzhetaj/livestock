@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises'
 import {createServer} from 'node:http'
 import {PGlite} from '@electric-sql/pglite'
 import {expect,test,vi} from 'vitest'
-import {dueSummary,localClock,reminderPreferences,summaryId} from '../server/reminderSchedule'
+import {dueSummary,localClock,reminderDays,reminderPreferences,summaryId} from '../server/reminderSchedule'
 import {createReminderStore} from '../server/reminderStore'
 import {createReminderHandler} from '../api/reminders'
 import {createAuthStore} from '../server/authStore'
@@ -29,6 +29,32 @@ test('daily local reminder windows handle DST, timezone boundaries, disabled and
  expect(dueSummary({...empty,tasks:[{...task,status:'cancelled'}]},prefs,new Date('2026-11-21T09:00:00Z'))).toBe(false)
  expect(summaryId(task.id,'2026-10-25')).toBe(summaryId(task.id,'2026-10-25'))
  expect(summaryId(task.id,'2026-10-26')).not.toBe(summaryId(task.id,'2026-10-25'))
+})
+test('reminders arrive 7, 3 and 1 day before and on the day, not every day of the week',()=>{
+ expect(reminderDays(7)).toEqual([7,3,1,0])
+ expect(reminderDays(3)).toEqual([3,1,0])
+ expect(reminderDays(0)).toEqual([0])
+ expect(reminderDays(14)).toEqual([14,7,3,1,0])
+ const week=reminderPreferences.parse({enabled:true,language:'sq',reminderTime:'08:00',leadDays:7,timeZone:'Europe/Tirane'})
+ // 08:30 in Tirana on 21 Nov 2026, the time the daily Vercel Cron (07:00 UTC) arrives in winter.
+ const morning=new Date('2026-11-21T07:30:00Z')
+ const due=(days:number)=>{const d=new Date(Date.UTC(2026,10,21+days));return d.toISOString().slice(0,10)}
+ const animalId=id(),event={id:id(),animalId,kind:'vaccination',dateOnly:true,occurredAt:time,createdAt:time,updatedAt:time}
+ const sent:number[]=[]
+ for(let days=-3;days<=10;days++){
+  const vaccination={id:id(),healthEventId:event.id,animalId,productName:'Synthetic',administeredAt:time,nextDueAt:due(days)+'T00:00:00.000Z'}
+  const byTask=dueSummary({...empty,tasks:[{...task,dueDate:due(days)}]},week,morning)
+  const byDate=dueSummary({...empty,events:[event],vaccinations:[vaccination]},week,morning)
+  if(byDate)sent.push(days)
+  // A pending task also repeats once overdue, until it is done.
+  expect(byTask).toBe(days<0||[7,3,1,0].includes(days))
+ }
+ // A recorded next-vaccination date without a task is announced only on the four reminder days.
+ expect(sent).toEqual([0,1,3,7])
+ // Before the chosen time nothing is sent, even on a reminder day.
+ expect(dueSummary({...empty,tasks:[{...task,dueDate:due(3)}]},week,new Date('2026-11-21T06:30:00Z'))).toBe(false)
+ // In summer the cron arrives at 09:xx local time, still after the default 08:00.
+ expect(dueSummary({...empty,tasks:[{...task,dueDate:'2026-07-04'}]},week,new Date('2026-07-01T07:05:00Z'))).toBe(true)
 })
 test('clinical reminders use explicit dates and latest amendments, avoiding tasks and archived animals',()=>{
  const animalId=id(),first={id:id(),animalId,kind:'vaccination',dateOnly:true,occurredAt:time,createdAt:time,updatedAt:time}

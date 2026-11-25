@@ -1,5 +1,6 @@
 {
   "regions": ["fra1"],
+  "crons": [{ "path": "/api/reminders", "schedule": "0 7 * * *" }],
   "git": { "deploymentEnabled": { "main": false, "codex/m7a-web-push": false, "codex/m7b-secure-push": false, "codex/m8-multi-device-sync": false } },
   "rewrites": [{ "source": "/((?!api/|assets/|.*\\.).*)", "destination": "/index.html" }]
 }
