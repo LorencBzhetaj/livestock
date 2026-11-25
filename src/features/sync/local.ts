@@ -181,7 +181,9 @@ export async function applyPage(db: LivestockDatabase, session: Session, from: s
       await db.syncRevisions.put({ id, version: change.version })
     }
     if (page.cursor !== String(prior) || page.more && page.changes.length === 0) throw new Error('Invalid page cursor')
-    await db.syncState.put({ ...state, cursor: page.cursor })
+    // Write only when the cursor moves. A rewrite with the same value still wakes the sync watcher
+    // (liveQuery), which then pulls again: an endless loop on an up-to-date device.
+    if (page.cursor !== from) await db.syncState.put({ ...state, cursor: page.cursor })
   })
 }
 

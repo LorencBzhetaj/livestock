@@ -35,8 +35,10 @@ test('password login, Vet read-only offline access, and logout preserve a separa
   await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve))
   const address=server.address()
   if(!address||typeof address==='string')throw Error()
+  let syncRequests=0
   await context.route('**/api/{auth,sync}',async route=>{
    const path=new URL(route.request().url()).pathname
+   if(path==='/api/sync')syncRequests++
    const cookies=await context.cookies(baseURL!)
    const response=await fetch('http://127.0.0.1:'+address.port+path,{method:'POST',
     headers:{origin:baseURL!,'content-type':'application/json',cookie:cookies.map(x=>x.name+'='+x.value).join('; ')},
@@ -120,6 +122,10 @@ test('password login, Vet read-only offline access, and logout preserve a separa
   await page.getByRole('button',{name:'Review records',exact:true}).click()
   await page.getByRole('button',{name:'Confirm and continue'}).click()
   await expect(page.getByText('Synced',{exact:true}).last()).toBeVisible()
+  // Once up to date, the device must stop asking the server (it used to loop about four times a second).
+  const settled=syncRequests
+  await page.waitForTimeout(3000)
+  expect(syncRequests-settled).toBeLessThanOrEqual(1)
   await page.getByRole('link',{name:'Animals',exact:true}).click()
   await expect(page.getByText('DEMO-001',{exact:true})).toHaveCount(0)
   await expect(page.getByText('The app is ready for offline use.')).toHaveCount(0)
