@@ -1,5 +1,5 @@
 import {lazy,Suspense,useEffect,useState} from 'react'
-import {authSession,type AuthSession} from './protocol'
+import {authSession,passwordMinimum,type AuthSession} from './protocol'
 import {setAccess} from './access'
 import {useLocation} from 'react-router-dom'
 const App=lazy(()=>import('../../app/App').then(m=>({default:m.App})))
@@ -11,7 +11,7 @@ const sq={
  error:'Hyrja dështoi. Kontrollo të dhënat ose prit para se të provosh përsëri.',
  logout:'Dil',vet:'Llogaria e veterinerit',current:'Fjalëkalimi yt aktual',save:'Ruaj llogarinë e veterinerit',
  done:'Llogaria u ruajt.',claim:'Konfirmoj lidhjen e të dhënave lokale ekzistuese me këtë llogari Admin.',
- readOnly:'Vetëm lexim',local:'Përdor të dhënat lokale ekzistuese',minimum:'Të paktën 12 karaktere.',
+ readOnly:'Vetëm lexim',local:'Përdor të dhënat lokale ekzistuese',minimum:`Të paktën ${passwordMinimum} karaktere.`,
 }
 const en:typeof sq={
  title:'Sign in to LivestockOS',username:'Username',password:'Password',remember:'Remember this device',
@@ -19,7 +19,7 @@ const en:typeof sq={
  error:'Sign-in failed. Check the details or wait before trying again.',
  logout:'Sign out',vet:'Veterinarian account',current:'Your current password',save:'Save veterinarian account',
  done:'Account saved.',claim:'I confirm linking existing local records to this Admin account.',
- readOnly:'Read only',local:'Use existing local records',minimum:'At least 12 characters.',
+ readOnly:'Read only',local:'Use existing local records',minimum:`At least ${passwordMinimum} characters.`,
 }
 async function call(input:object) {
  const res=await fetch('/api/auth',{method:'POST',credentials:'same-origin',cache:'no-store',
@@ -206,7 +206,7 @@ export default function Gate(){
      }}>{language==='sq'?'Vazhdo':'Continue'}</button>
     </div>:<form onSubmit={submit}>
      <label>{t.username}<input name="username" required autoComplete="username" autoCapitalize="none" spellCheck={false} pattern="adi|vet" defaultValue={setup?'adi':undefined} readOnly={setup}/></label>
-     <PasswordField label={t.password} name="password" minimum={setup?12:1} autoComplete={setup?'new-password':'current-password'} language={language}/>
+     <PasswordField label={t.password} name="password" minimum={setup?passwordMinimum:1} autoComplete={setup?'new-password':'current-password'} language={language}/>
      {setup&&<><p className="text-sm">{t.minimum}</p><label>{language==='sq'?'Kodi privat për hapjen e llogarisë':'Private account setup code'}<input name="code" type="password" required autoComplete="off"/></label></>}
      <label className="auth-remember"><input type="checkbox" name="remember"/>{t.remember}</label>
      <button className="registry-action" disabled={busy}>{setup?(language==='sq'?'Krijo llogarinë adi':'Create adi account'):t.login}</button>
@@ -240,7 +240,7 @@ export default function Gate(){
   }}>
    <h2>{t.vet}</h2>
    <label>{t.username}<input name="username" required value="vet" readOnly autoComplete="off"/></label>
-   <label>{t.password}<input name="password" type="password" minLength={12} maxLength={128} required autoComplete="new-password"/></label>
+   <label>{t.password}<input name="password" type="password" minLength={passwordMinimum} maxLength={128} required autoComplete="new-password"/></label>
    <p>{t.minimum}</p>
    <label>{t.current}<input name="currentPassword" type="password" required autoComplete="current-password"/></label>
    <button disabled={busy}>{t.save}</button>{saved&&<p role="status">{t.done}</p>}
